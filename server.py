@@ -15,7 +15,26 @@ from src.utils.config_loader import ConfigLoader
 import src.strategies.strategy_factory as strategy_factory_module
 from src.utils.stock_manager import stock_manager
 
+import logging
+
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger("CabinetServer")
+
 app = FastAPI(title="三省六部 AI 交易决策控制台")
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    logger.info(f"Incoming Request: {request.method} {request.url.path}")
+    response = await call_next(request)
+    logger.info(f"Response Status: {response.status_code}")
+    return response
 
 # CORS
 app.add_middleware(
@@ -125,24 +144,31 @@ async def api_switch_strategy(req: StrategySwitchRequest):
 @app.post("/api/control/reload_strategies")
 async def api_reload_strategies():
     """Hot reload strategies without restarting the server"""
+    logger.info("Received request to reload strategies...")
     try:
         # Reload the implemented_strategies module first
         if 'src.strategies.implemented_strategies' in sys.modules:
             importlib.reload(sys.modules['src.strategies.implemented_strategies'])
+            logger.info("Reloaded module: src.strategies.implemented_strategies")
         
         # Then reload the strategy_factory module
         importlib.reload(strategy_factory_module)
+        logger.info("Reloaded module: src.strategies.strategy_factory")
         
         # Test if we can create strategies
         strategies = strategy_factory_module.create_strategies()
         strategy_count = len(strategies)
         
+        strategy_names = [s.name for s in strategies]
+        logger.info(f"Strategy Factory Reloaded. Current Strategies ({strategy_count}): {strategy_names}")
+        
         return {
             "status": "success", 
             "msg": f"Successfully reloaded {strategy_count} strategies.",
-            "strategies": [s.name for s in strategies]
+            "strategies": strategy_names
         }
     except Exception as e:
+        logger.error(f"Failed to reload strategies: {str(e)}", exc_info=True)
         return {"status": "error", "msg": f"Failed to reload strategies: {str(e)}"}
 
 @app.get("/api/status")
@@ -289,7 +315,18 @@ async def emit_event_to_ws(event_type, data):
 
 @app.on_event("startup")
 async def startup_event():
-    print("Server Started. Access dashboard at http://localhost:8000")
+    logger.info("Initializing Cabinet Server...")
+    
+    # Log registered routes
+    logger.info("--- Registered API Endpoints ---")
+    for route in app.routes:
+        if hasattr(route, "methods"):
+            logger.info(f"{route.methods} {route.path}")
+    logger.info("--------------------------------")
+    
+    strategies = strategy_factory_module.create_strategies()
+    logger.info(f"Loaded {len(strategies)} Strategies: {[s.name for s in strategies]}")
+    logger.info("Server Started. Access dashboard at http://localhost:8000")
 
 @app.on_event("shutdown")
 async def shutdown_event():
