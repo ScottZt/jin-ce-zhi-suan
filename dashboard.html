@@ -177,6 +177,7 @@
 
         <div id="backtest-results" class="hidden p-6 rounded-lg relative">
             <button onclick="closeBacktest()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-times text-xl"></i></button>
+            <a href="/report" target="_blank" class="absolute top-4 right-14 text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded">回测报告页</a>
             <h2 class="text-2xl font-bold text-white mb-1 border-b border-slate-700 pb-2"><i class="fa-solid fa-chart-line text-trading-blue mr-2"></i>回测报告 (Backtest Report)</h2>
             <div class="text-xs text-slate-400 mb-4 font-mono">CODE: <span id="bt-code" class="text-white">--</span> | PERIOD: <span id="bt-period" class="text-white">--</span></div>
             
@@ -216,6 +217,11 @@
                         <!-- Rows -->
                     </tbody>
                 </table>
+            </div>
+
+            <div class="mt-6">
+                <div class="text-sm text-slate-300 font-bold mb-2">单策略回测报告</div>
+                <div id="bt-strategy-reports" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
             </div>
         </div>
     </div>
@@ -522,6 +528,7 @@
 
         // --- WebSocket Integration ---
         const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        let strategyReportsBuffer = [];
         
         ws.onopen = () => {
             console.log('Connected to Cabinet');
@@ -575,6 +582,9 @@
                     break;
                 case 'backtest_result':
                     showBacktestResults(data);
+                    break;
+                case 'backtest_strategy_report':
+                    upsertStrategyReport(data);
                     break;
             }
         }
@@ -761,6 +771,8 @@
             resultsDiv.classList.add('hidden');
             document.getElementById('backtest-progress-bar').style.width = '0%';
             document.getElementById('backtest-status-text').innerText = 'Initializing...';
+            strategyReportsBuffer = [];
+            document.getElementById('bt-strategy-reports').innerHTML = '';
             
             const code = document.getElementById('stock-search-input').value || '600036.SH';
             const strategy = document.getElementById('strategy-selector').value;
@@ -822,6 +834,45 @@
                 `;
                 tbody.appendChild(tr);
             });
+
+            renderStrategyReports();
+        }
+
+        function upsertStrategyReport(report) {
+            const idx = strategyReportsBuffer.findIndex(r => r.strategy_id === report.strategy_id);
+            if (idx >= 0) {
+                strategyReportsBuffer[idx] = report;
+            } else {
+                strategyReportsBuffer.push(report);
+            }
+            renderStrategyReports();
+        }
+
+        function renderStrategyReports() {
+            const wrap = document.getElementById('bt-strategy-reports');
+            if (!wrap) return;
+            wrap.innerHTML = '';
+            strategyReportsBuffer
+                .sort((a, b) => String(a.strategy_id).localeCompare(String(b.strategy_id)))
+                .forEach(r => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-slate-800/50 border border-slate-700 rounded p-3 text-xs font-mono';
+                    card.innerHTML = `
+                        <div class="text-white font-bold mb-2">策略 ${r.strategy_id}</div>
+                        <div class="text-slate-300">回测周期：${r.start_date} ~ ${r.end_date}</div>
+                        <div class="text-slate-300">初始资金：${Number(r.init_capital).toFixed(2)} 元</div>
+                        <div class="text-slate-300">结束资金：${Number(r.end_capital).toFixed(2)} 元</div>
+                        <div class="text-slate-300">总收益：${(Number(r.total_return) * 100).toFixed(2)}%</div>
+                        <div class="text-slate-300">年化收益：${(Number(r.annual_return) * 100).toFixed(2)}%</div>
+                        <div class="text-slate-300">最大回撤：${(Number(r.max_drawdown) * 100).toFixed(2)}%</div>
+                        <div class="text-slate-300">总交易次数：${r.trade_count}</div>
+                        <div class="text-slate-300">盈利次数：${r.win_num} | 亏损次数：${r.loss_num}</div>
+                        <div class="text-slate-300">胜率：${(Number(r.win_rate) * 100).toFixed(2)}%</div>
+                        <div class="text-slate-300">平均盈利：${Number(r.avg_win).toFixed(2)} | 平均亏损：${Number(r.avg_loss).toFixed(2)}</div>
+                        <div class="text-slate-300">盈亏比：${Number(r.profit_ratio).toFixed(2)}</div>
+                    `;
+                    wrap.appendChild(card);
+                });
         }
         
         function closeBacktest() {

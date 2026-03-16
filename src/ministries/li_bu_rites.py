@@ -125,3 +125,83 @@ class LiBuRites:
         df['rating'] = df.apply(get_rating, axis=1)
         
         return df
+
+    def generate_backtest_report(self, strategy_id, transactions, initial_capital, start_date=None, end_date=None):
+        closed_trades = [t for t in transactions if t.get('direction') == 'SELL']
+        trade_count = len(closed_trades)
+        win_trades = [t for t in closed_trades if t.get('pnl', 0) > 0]
+        loss_trades = [t for t in closed_trades if t.get('pnl', 0) <= 0]
+
+        win_num = len(win_trades)
+        loss_num = len(loss_trades)
+        win_rate = win_num / trade_count if trade_count > 0 else 0.0
+
+        total_pnl = sum(t.get('pnl', 0.0) for t in closed_trades)
+        init_cap = float(initial_capital)
+        end_cap = init_cap + total_pnl
+        total_return = (end_cap / init_cap - 1) if init_cap != 0 else 0.0
+
+        if start_date is not None and end_date is not None:
+            days = max((end_date - start_date).days, 1)
+            start_txt = str(start_date)[:10]
+            end_txt = str(end_date)[:10]
+        elif closed_trades:
+            trade_dates = [t['dt'] for t in closed_trades]
+            sdt = min(trade_dates)
+            edt = max(trade_dates)
+            days = max((edt - sdt).days, 1)
+            start_txt = str(sdt)[:10]
+            end_txt = str(edt)[:10]
+        else:
+            days = 1
+            start_txt = "--"
+            end_txt = "--"
+
+        annual_return = (1 + total_return) ** (252 / days) - 1 if days > 0 else 0.0
+
+        equity = [init_cap]
+        for t in closed_trades:
+            equity.append(equity[-1] + t.get('pnl', 0.0))
+        equity_series = pd.Series(equity)
+        max_value = equity_series.cummax()
+        drawdown = (equity_series - max_value) / max_value
+        max_drawdown = drawdown.min() if not drawdown.empty else 0.0
+
+        avg_win = float(np.mean([t.get('pnl', 0.0) for t in win_trades])) if win_trades else 0.0
+        avg_loss = abs(float(np.mean([t.get('pnl', 0.0) for t in loss_trades]))) if loss_trades else 0.0
+        profit_ratio = (avg_win / avg_loss) if avg_loss != 0 else 0.0
+
+        print("\n" + "=" * 55)
+        print("               📊 策略回测报告 📊")
+        print("=" * 55)
+        print(f"策略编号：{strategy_id}")
+        print(f"回测周期：{start_txt} ~ {end_txt}")
+        print(f"初始资金：{init_cap:.2f} 元")
+        print(f"结束资金：{end_cap:.2f} 元")
+        print(f"总收益：{total_return:.2%}")
+        print(f"年化收益：{annual_return:.2%}")
+        print(f"最大回撤：{max_drawdown:.2%}")
+        print(f"总交易次数：{trade_count}")
+        print(f"盈利次数：{win_num}  | 亏损次数：{loss_num}")
+        print(f"胜率：{win_rate:.2%}")
+        print(f"平均盈利：{avg_win:.2f}  | 平均亏损：{avg_loss:.2f}")
+        print(f"盈亏比：{profit_ratio:.2f}")
+        print("=" * 55 + "\n")
+
+        return {
+            "strategy_id": strategy_id,
+            "start_date": start_txt,
+            "end_date": end_txt,
+            "init_capital": init_cap,
+            "end_capital": end_cap,
+            "total_return": total_return,
+            "annual_return": annual_return,
+            "max_drawdown": float(max_drawdown),
+            "trade_count": trade_count,
+            "win_num": win_num,
+            "loss_num": loss_num,
+            "win_rate": win_rate,
+            "avg_win": avg_win,
+            "avg_loss": avg_loss,
+            "profit_ratio": profit_ratio
+        }

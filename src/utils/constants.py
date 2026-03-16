@@ -8,7 +8,7 @@ TRANSFER_FEE = 0.00001     # 过户费 万0.1
 SLIPPAGE = 0.001           # 滑点 0.1%
 
 # 风控红线
-MAX_STOP_LOSS_PCT = 0.01       # 单笔止损 <= 1%
+MAX_STOP_LOSS_PCT = 0.05       # 单笔止损 <= 5%
 MAX_POS_PER_STOCK = 0.10       # 单票最大仓位 10%
 MAX_TOTAL_POS = 0.50           # 总仓位上限 50%
 MAX_DAILY_LOSS_PCT = 0.02      # 单日最大亏损 2%

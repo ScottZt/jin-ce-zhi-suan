@@ -5,15 +5,15 @@
     "log_level": "INFO" // 日志级别: DEBUG, INFO, WARNING, ERROR
   },
   "data_provider": {
-    "source": "tushare", // 数据源选择: "akshare" (免费/默认), "tushare" (需Token), "default" (自定义API)
+    "source": "default", // 数据源选择: "akshare" (免费/默认), "tushare" (需Token), "default" (自定义API)
     
     // Tushare 配置 (仅当 source="tushare" 时生效)
     "tushare_token": "4ba065ecb8eebdebc93dffaef6bc051eeb3a98b46eb7d94fd697282f",
     
     // 自定义 API 配置 (仅当 source="default" 时生效)
     // 示例: 您的 Quantify API 服务地址
-    "default_api_key": "quantify-api-2026",
-    "default_api_url": "https://automobiles-thumbnail-openings-wishing.trycloudflare.com"
+    "default_api_key": "abc123",
+    "default_api_url": "https://expected-miracle-mice-automatic.trycloudflare.com"
   },
   "targets": [
     "301227.SZ" // 森鹰窗业
@@ -24,7 +24,7 @@
     "active_ids": ["01", "02", "03", "04", "05", "06", "07"]
   },
   "risk_control": {
-    "max_stop_loss_pct": 0.01,    // 单笔最大止损幅度 (1%)
+    "max_stop_loss_pct": 0.05,    // 单笔最大止损幅度 (5%)
     "max_pos_per_stock": 0.10,    // 单票最大仓位 (10%)
     "max_total_pos": 0.50,        // 总仓位上限 (50%)
     "max_daily_loss_pct": 0.02    // 单日最大亏损熔断线 (2%)

@@ -13,18 +13,20 @@ from src.ministries.bing_bu_war import BingBuWar
 from src.ministries.xing_bu_justice import XingBuJustice
 from src.ministries.gong_bu_works import GongBuWorks
 import src.strategies.strategy_factory as strategy_factory_module
+from src.strategies.strategy_factory import create_strategies
 from src.utils.data_provider import DataProvider
 from src.utils.tushare_provider import TushareProvider
 from src.utils.akshare_provider import AkshareProvider
 from src.utils.config_loader import ConfigLoader
 
 class BacktestCabinet:
-    def __init__(self, stock_code, strategy_id='all', initial_capital=1000000.0, event_callback=None):
+    def __init__(self, stock_code, strategy_id='all', initial_capital=1000000.0, event_callback=None, strategy_mode=None, strategy_ids=None):
         self.stock_code = stock_code
         self.strategy_id = strategy_id
         self.initial_capital = initial_capital
         self.event_callback = event_callback
-        
+        self.strategy_mode = strategy_mode
+        self.strategy_ids = strategy_ids
         self.config = ConfigLoader()
         
         # Initialize Ministries
@@ -42,11 +44,16 @@ class BacktestCabinet:
 
         # Initialize Strategies
         # Get the latest strategies every time we start a backtest
-        all_strategies = strategy_factory_module.create_strategies()
-        if strategy_id == 'all':
+        all_strategies = create_strategies()
+        if self.strategy_ids:
+            allowed = set(self.strategy_ids)
+            self.strategies = [s for s in all_strategies if s.id in allowed]
+        elif self.strategy_mode == 'top5':
+            self.strategies = all_strategies[:5]
+        elif self.strategy_id == 'all':
             self.strategies = all_strategies
         else:
-            self.strategies = [s for s in all_strategies if s.id == strategy_id]
+            self.strategies = [s for s in all_strategies if s.id == self.strategy_id]
             
         self.secretariat = ZhongshuSheng(self.strategies)
         
@@ -67,16 +74,36 @@ class BacktestCabinet:
         
         # 1. Fetch Data
         provider_source = self.config.get("data_provider.source", "default")
+        enable_fallback = bool(self.config.get("data_provider.enable_fallback", False))
+        # Primary provider
         if provider_source == 'tushare':
             provider = TushareProvider(token=self.config.get("data_provider.tushare_token"))
         elif provider_source == 'akshare':
             provider = AkshareProvider()
         else:
             provider = DataProvider()
-            
         df = provider.fetch_minute_data(self.stock_code, start_date, end_date)
+        # Fallback chain if empty
+        if df.empty and enable_fallback:
+            # Try Tushare if token exists and wasn't primary
+            token = self.config.get("data_provider.tushare_token")
+            if token and provider_source != 'tushare':
+                await self._emit('system', {'msg': f"主数据源无数据，尝试 Tushare 获取 {self.stock_code} 历史K线..."})
+                try:
+                    df = TushareProvider(token=token).fetch_minute_data(self.stock_code, start_date, end_date)
+                except Exception:
+                    df = pd.DataFrame()
+        if df.empty and enable_fallback and provider_source != 'akshare':
+            await self._emit('system', {'msg': f"Tushare 无数据，尝试 Akshare 获取 {self.stock_code} 历史K线..."})
+            try:
+                df = AkshareProvider().fetch_minute_data(self.stock_code, start_date, end_date)
+            except Exception:
+                df = pd.DataFrame()
         if df.empty:
-            await self._emit('system', {'msg': f"❌ 无法获取 {self.stock_code} 的历史数据，回测终止。"})
+            provider_msg = ""
+            if provider_source == "default" and hasattr(provider, "last_error") and provider.last_error:
+                provider_msg = f" 诊断: {provider.last_error}"
+            await self._emit('system', {'msg': f"❌ 无法获取 {self.stock_code} 的历史数据，回测终止。{provider_msg}"})
             return
 
         df = self.works.clean_data(df)
@@ -154,6 +181,15 @@ class BacktestCabinet:
         for s in self.strategies:
             report = self.rites.generate_report(s.id, self.revenue, self.justice, self.initial_capital/len(self.strategies))
             reports.append(report)
+            strategy_transactions = [t for t in self.revenue.transactions if t.get('strategy_id') == s.id]
+            formatted = self.rites.generate_backtest_report(
+                strategy_id=s.id,
+                transactions=strategy_transactions,
+                initial_capital=self.initial_capital / len(self.strategies),
+                start_date=start_date,
+                end_date=end_date
+            )
+            await self._emit('backtest_strategy_report', formatted)
             
         ranking = self.rites.generate_ranking(reports)
         
