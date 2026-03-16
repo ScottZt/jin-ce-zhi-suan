@@ -279,6 +279,9 @@
             <button onclick="reloadStrategies()" class="bg-trading-blue hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs transition-all border border-blue-500">
                 <i class="fa-solid fa-rotate"></i> 热更新策略
             </button>
+            <a href="/report" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs transition-all border border-indigo-500">
+                <i class="fa-solid fa-file-lines"></i> 打开报告
+            </a>
             <div class="w-2 h-2 rounded-full bg-trading-green animate-pulse-fast shadow-[0_0_10px_rgba(16,185,129,0.5)]" title="System Online"></div>
         </div>
     </header>
@@ -459,6 +462,18 @@
             <div class="flex items-center gap-2 text-trading-dim text-xs font-bold uppercase tracking-widest border-b border-slate-700 pb-2">
                 <i class="fa-solid fa-clock-rotate-left"></i> 系统运行日志 (System Logs)
             </div>
+
+            <div class="glass-panel rounded-lg p-3 border border-slate-700/70">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-xs uppercase tracking-widest text-slate-400">Live 控制台</div>
+                    <span id="live-run-state" class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-200">待机</span>
+                </div>
+                <div class="text-[11px] text-slate-300 mb-1">本tick触发周期</div>
+                <div id="live-trigger-summary" class="font-mono text-[11px] text-cyan-300 bg-slate-900/60 border border-slate-700 rounded p-2 mb-2">--</div>
+                <div class="text-[11px] text-slate-300 mb-1">本tick策略列表</div>
+                <div id="live-strategy-summary" class="font-mono text-[11px] text-emerald-300 bg-slate-900/60 border border-slate-700 rounded p-2">--</div>
+                <div class="text-[10px] text-slate-500 mt-2">周期对照：1min=1分钟，5min=5分钟，10min=10分钟，15min=15分钟，30min=30分钟，60min=60分钟，D=日线</div>
+            </div>
             
             <div class="glass-panel flex-1 rounded-lg p-0 overflow-hidden flex flex-col">
                 <div class="p-2 bg-slate-800/50 text-[10px] text-center text-slate-400 border-b border-slate-700">实时指令流 (Live Stream)</div>
@@ -489,10 +504,24 @@
                     <!-- Dynamic Content -->
                 </div>
             </div>
+            <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded border border-slate-600">
+                <span class="text-slate-400 text-xs"><i class="fa-solid fa-calendar-days"></i></span>
+                <select id="bt-range-select" class="bg-transparent text-white focus:outline-none text-xs font-medium">
+                    <option value="1y" selected>近1年</option>
+                    <option value="3m">近3个月</option>
+                    <option value="6m">近6个月</option>
+                    <option value="2y">近2年</option>
+                    <option value="ytd">今年以来</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded border border-slate-600">
+                <span class="text-slate-400 text-xs"><i class="fa-solid fa-yen-sign"></i></span>
+                <input id="bt-capital-input" type="number" min="10000" step="10000" value="1000000" class="bg-transparent border-none text-white focus:outline-none w-28 text-xs font-mono" />
+            </div>
         </div>
 
         <!-- Global Status Bar -->
-        <div class="flex-1 mx-8">
+        <div class="w-72 ml-12 mr-4">
             <div class="flex justify-between text-[10px] text-slate-400 mb-1">
                 <span>AI 决策置信度 (Confidence)</span>
                 <span class="text-trading-green" id="confidence-val">98.5%</span>
@@ -500,20 +529,55 @@
             <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                 <div class="bg-gradient-to-r from-blue-500 to-green-500 h-full w-[98.5%] animate-pulse" id="confidence-bar"></div>
             </div>
+            <div id="confidence-desc" class="text-[10px] text-slate-500 mt-1">一致性 50% · 放行率 50% · 胜率 50%</div>
         </div>
 
         <div class="flex items-center gap-3">
-            <div class="text-xs text-slate-500 font-mono">STATUS: <span class="text-trading-green animate-pulse">RUNNING</span></div>
-            
+            <div class="text-xs text-slate-500 font-mono">系统状态：<span id="system-status-text" class="text-slate-300">待机</span></div>
+            <button id="live-toggle-btn" onclick="toggleLive()" class="bg-trading-green hover:bg-emerald-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-emerald-500 hover:-translate-y-0.5 active:scale-95 min-w-[128px]">
+                <i id="live-toggle-icon" class="fa-solid fa-satellite-dish"></i>
+                <span id="live-toggle-label">启动 Live</span>
+            </button>
             <button onclick="startBacktest()" class="bg-trading-blue hover:bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm transition-all shadow-[0_0_10px_rgba(59,130,246,0.3)] border border-blue-500">
                 <i class="fa-solid fa-play"></i> 立即回测
             </button>
             
-            <button class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-slate-600">
+            <button onclick="toggleDebugPanel()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-slate-600">
                 <i class="fa-solid fa-terminal"></i> 调试
             </button>
         </div>
     </footer>
+
+    <div id="debug-panel" class="hidden fixed right-4 bottom-20 w-[440px] max-w-[92vw] bg-slate-900/95 border border-slate-700 rounded-lg shadow-2xl z-[120] overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+            <div class="text-sm font-bold text-white"><i class="fa-solid fa-bug mr-2 text-amber-400"></i>调试面板</div>
+            <button onclick="toggleDebugPanel()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="p-4 space-y-3 text-xs">
+            <div class="grid grid-cols-2 gap-2">
+                <div class="bg-slate-800/70 border border-slate-700 rounded p-2">
+                    <div class="text-slate-400 mb-1">连接状态</div>
+                    <div id="debug-conn-status" class="font-mono text-emerald-300">已连接</div>
+                </div>
+                <div class="bg-slate-800/70 border border-slate-700 rounded p-2">
+                    <div class="text-slate-400 mb-1">接口延迟</div>
+                    <div id="debug-api-latency" class="font-mono text-cyan-300">-- ms</div>
+                </div>
+            </div>
+            <div class="bg-slate-800/70 border border-slate-700 rounded p-2">
+                <div class="text-slate-400 mb-1">当前tick触发策略</div>
+                <div id="debug-tick-trigger" class="font-mono text-slate-200 break-words whitespace-pre-line">--</div>
+            </div>
+            <div class="bg-slate-800/70 border border-slate-700 rounded p-2">
+                <div class="text-slate-400 mb-1">最近5条风控拒绝</div>
+                <div id="debug-risk-rejects" class="space-y-1 text-rose-300 font-mono">暂无</div>
+            </div>
+            <div class="bg-slate-800/70 border border-slate-700 rounded p-2">
+                <div class="text-slate-400 mb-1">置信度拆解</div>
+                <div id="debug-confidence-breakdown" class="text-slate-200 font-mono">一致性 50% · 放行率 50% · 胜率 50% · 融合 50%</div>
+            </div>
+        </div>
+    </div>
 
     <!-- JavaScript Logic -->
     <script>
@@ -529,12 +593,26 @@
         // --- WebSocket Integration ---
         const ws = new WebSocket(`ws://${window.location.host}/ws`);
         let strategyReportsBuffer = [];
+        let liveRunning = false;
+        let liveActionPending = false;
+        const DIAG_STATE = {
+            wsConnected: false,
+            apiLatencyMs: null,
+            tickTriggerText: '--',
+            tickStrategyText: '--',
+            signalConsistency: 50,
+            riskApproved: 0,
+            riskRejected: 0,
+            riskRejects: [],
+            recentPnls: []
+        };
         
         ws.onopen = () => {
             console.log('Connected to Cabinet');
             logMessage('SYSTEM', 'WebSocket 连接成功', 'system');
-            // Auto-start upon connection
-            startSimulation();
+            DIAG_STATE.wsConnected = true;
+            updateDebugPanel();
+            syncStatus();
         };
         
         ws.onmessage = (event) => {
@@ -544,6 +622,8 @@
         
         ws.onclose = () => {
             logMessage('SYSTEM', 'WebSocket 连接断开', 'danger');
+            DIAG_STATE.wsConnected = false;
+            updateDebugPanel();
         };
 
         function handleEvent(payload) {
@@ -552,6 +632,16 @@
             switch(type) {
                 case 'system':
                     logMessage('SYSTEM', data.msg, 'system');
+                    if ((data.msg || '').includes('实时监控已启动')) {
+                        liveRunning = true;
+                        liveActionPending = false;
+                        renderLiveStatus();
+                    }
+                    if ((data.msg || '').includes('已手动停止')) {
+                        liveRunning = false;
+                        liveActionPending = false;
+                        renderLiveStatus();
+                    }
                     break;
                 case 'init_strategies':
                     updateStrategyList(data);
@@ -567,6 +657,18 @@
                 case 'menxia':
                     updateCard('log-menxia', data.details, data.status);
                     logMessage('风控中心', data.msg, data.status.includes('green') ? 'success' : 'danger');
+                    if (data.decision === 'approved') {
+                        DIAG_STATE.riskApproved += 1;
+                        updateConfidenceScore();
+                    }
+                    if (data.decision === 'rejected') {
+                        DIAG_STATE.riskRejected += 1;
+                        const item = `[${getTime()}] [${data.strategy_id || '--'}] ${data.reason || data.msg || '风控拒绝'}`;
+                        DIAG_STATE.riskRejects.unshift(item);
+                        DIAG_STATE.riskRejects = DIAG_STATE.riskRejects.slice(0, 5);
+                        updateDebugPanel();
+                        updateConfidenceScore();
+                    }
                     break;
                 case 'shangshu':
                     updateCard('log-shangshu', data.details, data.status);
@@ -576,6 +678,22 @@
                     if(data.assets) document.getElementById('total-assets').innerText = '¥ ' + parseFloat(data.assets).toLocaleString();
                     if(data.pnl) document.getElementById('daily-pnl').innerText = data.pnl;
                     if(data.pos_ratio) document.getElementById('position-ratio').innerText = data.pos_ratio;
+                    break;
+                case 'live_tick':
+                    renderLiveTick(data);
+                    DIAG_STATE.apiLatencyMs = data.api_latency_ms ?? DIAG_STATE.apiLatencyMs;
+                    DIAG_STATE.signalConsistency = Number(data.signal_consistency ?? DIAG_STATE.signalConsistency);
+                    DIAG_STATE.tickTriggerText = `${data.time || '--'} ${formatTriggerSummaryZh(data.trigger_summary || '--')}`;
+                    DIAG_STATE.tickStrategyText = data.strategy_summary || '--';
+                    updateDebugPanel();
+                    updateConfidenceScore();
+                    break;
+                case 'trade_exec':
+                    if (typeof data.realized_pnl === 'number') {
+                        DIAG_STATE.recentPnls.push(Number(data.realized_pnl));
+                        if (DIAG_STATE.recentPnls.length > 20) DIAG_STATE.recentPnls.shift();
+                        updateConfidenceScore();
+                    }
                     break;
                 case 'backtest_progress':
                     updateBacktestProgress(data);
@@ -618,11 +736,41 @@
 
         function startSimulation() {
             logMessage('SYSTEM', '正在自动启动内阁进程...', 'system');
-            const code = document.getElementById('stock-search-input').value || '600036';
+            const code = normalizeCode(document.getElementById('stock-search-input').value || '600036');
             ws.send(JSON.stringify({
                 type: 'start_simulation',
                 stock: code
             }));
+            liveRunning = true;
+            renderLiveStatus();
+        }
+
+        function setLiveActionPending(pending) {
+            liveActionPending = pending;
+            renderLiveStatus();
+        }
+
+        function toggleLive() {
+            if (liveActionPending) return;
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                logMessage('SYSTEM', 'WebSocket 未连接，无法切换 Live', 'danger');
+                return;
+            }
+            const raw = document.getElementById('stock-search-input').value || '';
+            const code = normalizeCode(raw);
+            if (!/^\d{6}\.(SH|SZ)$/.test(code)) {
+                logMessage('SYSTEM', `股票代码无效: ${raw}`, 'danger');
+                return;
+            }
+            setLiveActionPending(true);
+            if (liveRunning) {
+                stopSimulation();
+            } else {
+                startSimulation();
+            }
+            setTimeout(() => {
+                syncStatus().finally(() => setLiveActionPending(false));
+            }, 1500);
         }
 
         // --- Stock Search Logic ---
@@ -688,7 +836,7 @@
                 // Start new
                 ws.send(JSON.stringify({
                     type: 'start_simulation',
-                    stock: code
+                    stock: normalizeCode(code)
                 }));
             }, 1000);
         }
@@ -697,7 +845,154 @@
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'stop_simulation' }));
                 logMessage('SYSTEM', '发送停止指令');
+                liveRunning = false;
+                renderLiveStatus();
             }
+        }
+
+        function normalizeCode(raw) {
+            const v = String(raw || '').trim().toUpperCase();
+            if (v.includes('.SH') || v.includes('.SZ')) return v;
+            if (/^\d{6}$/.test(v)) return v.startsWith('6') ? `${v}.SH` : `${v}.SZ`;
+            return v;
+        }
+
+        function renderLiveStatus() {
+            const text = document.getElementById('system-status-text');
+            const badge = document.getElementById('live-run-state');
+            const btn = document.getElementById('live-toggle-btn');
+            const icon = document.getElementById('live-toggle-icon');
+            const label = document.getElementById('live-toggle-label');
+            if (!text || !badge || !btn || !icon || !label) return;
+            if (liveActionPending) {
+                text.className = 'text-trading-yellow animate-pulse';
+                text.innerText = '切换中';
+                badge.className = 'text-[10px] px-2 py-0.5 rounded bg-amber-700 text-white animate-pulse';
+                badge.innerText = '切换中';
+                btn.className = 'bg-amber-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-amber-500 min-w-[128px] cursor-not-allowed opacity-90';
+                icon.className = 'fa-solid fa-spinner animate-spin';
+                label.innerText = '切换中...';
+                btn.disabled = true;
+                return;
+            }
+            if (liveRunning) {
+                text.className = 'text-trading-green animate-pulse';
+                text.innerText = '实时运行中';
+                badge.className = 'text-[10px] px-2 py-0.5 rounded bg-emerald-700 text-white animate-pulse';
+                badge.innerText = '运行中';
+                btn.className = 'bg-trading-red hover:bg-rose-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-rose-500 hover:-translate-y-0.5 active:scale-95 min-w-[128px]';
+                icon.className = 'fa-solid fa-stop';
+                label.innerText = '停止 Live';
+                btn.disabled = false;
+            } else {
+                text.className = 'text-slate-300';
+                text.innerText = '待机';
+                badge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-200';
+                badge.innerText = '待机';
+                btn.className = 'bg-trading-green hover:bg-emerald-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-emerald-500 hover:-translate-y-0.5 active:scale-95 min-w-[128px]';
+                icon.className = 'fa-solid fa-satellite-dish';
+                label.innerText = '启动 Live';
+                btn.disabled = false;
+            }
+        }
+
+        function toZhTimeframe(tf) {
+            const m = {
+                '1min': '1分钟',
+                '5min': '5分钟',
+                '10min': '10分钟',
+                '15min': '15分钟',
+                '30min': '30分钟',
+                '60min': '60分钟',
+                'D': '日线'
+            };
+            return m[tf] || tf;
+        }
+
+        function formatTriggerSummaryZh(text) {
+            if (!text || text === '无') return '无';
+            return text.split('|').map(part => {
+                const p = part.trim();
+                const idx = p.indexOf(':');
+                if (idx < 0) return p;
+                const tf = p.slice(0, idx).trim();
+                const rest = p.slice(idx + 1).trim();
+                return `${toZhTimeframe(tf)}:${rest}`;
+            }).join(' | ');
+        }
+
+        function renderLiveTick(data) {
+            const trigger = document.getElementById('live-trigger-summary');
+            const list = document.getElementById('live-strategy-summary');
+            if (trigger) trigger.innerText = `[${data.time || '--'}] ${formatTriggerSummaryZh(data.trigger_summary || '--')}`;
+            if (list) list.innerText = data.strategy_summary || '--';
+        }
+
+        function toggleDebugPanel() {
+            const panel = document.getElementById('debug-panel');
+            if (!panel) return;
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) updateDebugPanel();
+        }
+
+        function updateDebugPanel() {
+            const conn = document.getElementById('debug-conn-status');
+            const latency = document.getElementById('debug-api-latency');
+            const tick = document.getElementById('debug-tick-trigger');
+            const rejects = document.getElementById('debug-risk-rejects');
+            const breakdown = document.getElementById('debug-confidence-breakdown');
+            if (conn) {
+                conn.className = `font-mono ${DIAG_STATE.wsConnected ? 'text-emerald-300' : 'text-rose-300'}`;
+                conn.innerText = DIAG_STATE.wsConnected ? '已连接' : '已断开';
+            }
+            if (latency) {
+                latency.innerText = DIAG_STATE.apiLatencyMs === null ? '-- ms' : `${DIAG_STATE.apiLatencyMs} ms`;
+            }
+            if (tick) {
+                tick.innerText = `${DIAG_STATE.tickTriggerText}\n${DIAG_STATE.tickStrategyText}`;
+            }
+            if (rejects) {
+                if (!DIAG_STATE.riskRejects.length) {
+                    rejects.innerHTML = '<div class="text-slate-400">暂无</div>';
+                } else {
+                    rejects.innerHTML = DIAG_STATE.riskRejects.map(x => `<div>${x}</div>`).join('');
+                }
+            }
+            if (breakdown) {
+                breakdown.innerText = document.getElementById('confidence-desc')?.innerText || '--';
+            }
+        }
+
+        function updateConfidenceScore() {
+            const consistency = Math.max(0, Math.min(100, Number(DIAG_STATE.signalConsistency || 0)));
+            const riskTotal = DIAG_STATE.riskApproved + DIAG_STATE.riskRejected;
+            const riskPassRate = riskTotal > 0 ? (DIAG_STATE.riskApproved / riskTotal) * 100 : 50;
+            const wins = DIAG_STATE.recentPnls.filter(v => v > 0).length;
+            const losses = DIAG_STATE.recentPnls.filter(v => v <= 0).length;
+            const tradeTotal = wins + losses;
+            const recentWinRate = tradeTotal > 0 ? (wins / tradeTotal) * 100 : 50;
+            const score = consistency * 0.40 + riskPassRate * 0.35 + recentWinRate * 0.25;
+
+            const valEl = document.getElementById('confidence-val');
+            const barEl = document.getElementById('confidence-bar');
+            const descEl = document.getElementById('confidence-desc');
+            if (valEl) valEl.innerText = `${score.toFixed(1)}%`;
+            if (barEl) {
+                barEl.style.width = `${Math.max(0, Math.min(100, score)).toFixed(1)}%`;
+            }
+            if (descEl) {
+                descEl.innerText = `一致性 ${consistency.toFixed(1)}% · 放行率 ${riskPassRate.toFixed(1)}% · 胜率 ${recentWinRate.toFixed(1)}%`;
+            }
+            updateDebugPanel();
+        }
+
+        async function syncStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                liveRunning = Boolean(data.is_running && data.active_cabinet_type === 'live');
+                renderLiveStatus();
+            } catch (_) {}
         }
 
         function reloadStrategies() {
@@ -774,14 +1069,34 @@
             strategyReportsBuffer = [];
             document.getElementById('bt-strategy-reports').innerHTML = '';
             
-            const code = document.getElementById('stock-search-input').value || '600036.SH';
+            const code = normalizeCode(document.getElementById('stock-search-input').value || '600036.SH');
             const strategy = document.getElementById('strategy-selector').value;
+            const range = document.getElementById('bt-range-select')?.value || '1y';
+            const capitalRaw = Number(document.getElementById('bt-capital-input')?.value || 1000000);
+            const capital = Number.isFinite(capitalRaw) && capitalRaw >= 10000 ? Math.floor(capitalRaw) : 1000000;
+            const dates = getBacktestDateRange(range);
             
             ws.send(JSON.stringify({
                 type: 'start_backtest',
                 stock: code,
-                strategy: strategy
+                strategy: strategy,
+                start: dates.start,
+                end: dates.end,
+                capital: capital
             }));
+        }
+
+        function getBacktestDateRange(range) {
+            const end = new Date();
+            const start = new Date(end);
+            const currentYearStart = new Date(end.getFullYear(), 0, 1);
+            if (range === '3m') start.setMonth(start.getMonth() - 3);
+            else if (range === '6m') start.setMonth(start.getMonth() - 6);
+            else if (range === '2y') start.setFullYear(start.getFullYear() - 2);
+            else if (range === 'ytd') start.setTime(currentYearStart.getTime());
+            else start.setFullYear(start.getFullYear() - 1);
+            const fmt = (d) => d.toISOString().slice(0, 10);
+            return { start: fmt(start), end: fmt(end) };
         }
         
         function updateBacktestProgress(data) {
@@ -926,6 +1241,8 @@
         
         // Initial Log
         logMessage('SYSTEM', '控制台就绪，等待连接...', 'info');
+        renderLiveStatus();
+        updateConfidenceScore();
 
     </script>
 </body>

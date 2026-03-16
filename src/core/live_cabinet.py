@@ -208,6 +208,7 @@ class LiveCabinet:
     async def _tick(self, simulation_mode=False):
         current_dt = None
         bar = None
+        api_latency_ms = 0
         
         if simulation_mode:
             # Generate Mock Bar
@@ -234,7 +235,9 @@ class LiveCabinet:
             current_dt = self.last_dt
         else:
             # 1. Get Real-time Data
+            t0 = time.perf_counter()
             bar = self.provider.get_latest_bar(self.stock_code)
+            api_latency_ms = int((time.perf_counter() - t0) * 1000)
             if not bar:
                 return
 
@@ -268,6 +271,22 @@ class LiveCabinet:
         print(f"   📋 本tick策略列表: {name_text if name_text else '无'}")
         signals = self.secretariat.generate_signals(bar, runnable_strategy_ids=runnable_strategy_ids)
         active_signals = signals
+        buy_signals = len([s for s in active_signals if s.get('direction') == 'BUY'])
+        sell_signals = len([s for s in active_signals if s.get('direction') == 'SELL'])
+        if len(active_signals) == 0:
+            signal_consistency = 50.0
+        else:
+            signal_consistency = max(buy_signals, sell_signals) / len(active_signals) * 100.0
+        await self._emit_event('live_tick', {
+            'time': current_dt.strftime("%H:%M:%S"),
+            'trigger_summary': tf_text if tf_text else '无',
+            'strategy_summary': name_text if name_text else '无',
+            'runnable_ids': runnable_strategy_ids,
+            'runnable_count': len(runnable_strategy_ids),
+            'signal_count': len(active_signals),
+            'signal_consistency': round(signal_consistency, 2),
+            'api_latency_ms': api_latency_ms
+        })
         
         if not active_signals:
             print("   💤 无策略信号")
@@ -301,7 +320,9 @@ class LiveCabinet:
                 await self._emit_event('menxia', {
                     'msg': "风控审核通过",
                     'details': "> 风险敞口: 合规<br>> 批准执行",
-                    'status': 'bg-trading-green'
+                    'status': 'bg-trading-green',
+                    'decision': 'approved',
+                    'strategy_id': strategy_id
                 })
                 
                 # 4. Execution (ShangshuSheng) - Virtual Execution
@@ -316,6 +337,19 @@ class LiveCabinet:
                     new_qty = self.state_affairs.positions[strategy_id][signal['code']]['qty'] if signal['code'] in self.state_affairs.positions.get(strategy_id, {}) else 0
                     self.secretariat.update_strategy_state(strategy_id, signal['code'], new_qty)
                     print(f"   🚀 执行成功! 当前持仓: {new_qty}")
+                    realized_pnl = None
+                    if self.revenue.transactions:
+                        last_tx = self.revenue.transactions[-1]
+                        if last_tx.get('strategy_id') == strategy_id and last_tx.get('direction') == 'SELL':
+                            realized_pnl = float(last_tx.get('pnl', 0.0))
+                    await self._emit_event('trade_exec', {
+                        'time': current_dt.strftime("%H:%M:%S"),
+                        'strategy_id': strategy_id,
+                        'direction': signal.get('direction'),
+                        'price': float(signal.get('price', 0.0)),
+                        'qty': int(signal.get('qty', 0)),
+                        'realized_pnl': realized_pnl
+                    })
                     
                     await self._emit_event('shangshu', {
                     'msg': f"执行成功! 持仓: {new_qty}",
@@ -333,7 +367,10 @@ class LiveCabinet:
                 await self._emit_event('menxia', {
                     'msg': f"风控驳回: {reason}",
                     'details': f"> 原因: {reason}<br>> 建议: 观望",
-                    'status': 'bg-trading-red'
+                    'status': 'bg-trading-red',
+                    'decision': 'rejected',
+                    'strategy_id': strategy_id,
+                    'reason': reason
                 })
 
         # 5. Check Stops
@@ -347,6 +384,19 @@ class LiveCabinet:
                 })
             self.state_affairs.execute_order(order['strategy_id'], order, bar)
             self.secretariat.update_strategy_state(order['strategy_id'], order['code'], 0)
+            realized_pnl = None
+            if self.revenue.transactions:
+                last_tx = self.revenue.transactions[-1]
+                if last_tx.get('strategy_id') == order.get('strategy_id') and last_tx.get('direction') == 'SELL':
+                    realized_pnl = float(last_tx.get('pnl', 0.0))
+            await self._emit_event('trade_exec', {
+                'time': current_dt.strftime("%H:%M:%S"),
+                'strategy_id': order.get('strategy_id'),
+                'direction': 'SELL',
+                'price': float(order.get('price', 0.0)),
+                'qty': int(order.get('qty', 0)),
+                'realized_pnl': realized_pnl
+            })
 
     def _check_market_close(self, current_dt):
         # Archive at 15:00
