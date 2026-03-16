@@ -86,6 +86,7 @@ class LiBuRites:
         
         return {
             'strategy_id': strategy_id,
+            'total_pnl': total_pnl,  # Added this field
             'roi': roi,
             'annualized_roi': annualized_roi,
             'max_dd': max_dd_pct,

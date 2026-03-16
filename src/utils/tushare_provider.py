@@ -147,19 +147,7 @@ class TushareProvider:
         try:
             print(f"DEBUG: Requesting Tushare data for {code} ({start_str} - {end_str})")
             
-            # Using pro.stk_mins directly as per user request/example
-            # limit is max 8000 usually, but user mentioned 50000 daily limit quota.
-            # The example uses limit='241'.
-            # We should paginate if range is large.
-            
-            # Note: stk_mins might need specific permission (5000 points usually).
-            # The user shared an example using `pro.stk_mins`.
-            
-            # Calculate total minutes needed to decide loop?
-            # Or just loop by day?
-            # Tushare pro.stk_mins takes start_date and end_date.
-            
-            # Let's try direct call first.
+            # Use pro.stk_mins as it proved more reliable for the user's specific token/permission
             df = self.pro.stk_mins(ts_code=code, freq='1min', start_date=start_str, end_date=end_str)
             
             if df is None or df.empty:
@@ -175,6 +163,12 @@ class TushareProvider:
             
             # Ensure datetime
             df['dt'] = pd.to_datetime(df['dt'])
+            
+            # Ensure numeric types
+            numeric_cols = ['open', 'close', 'high', 'low', 'vol', 'amount']
+            for col in numeric_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
             
             # Sort ascending (Tushare usually returns descending)
             df = df.sort_values('dt').reset_index(drop=True)
