@@ -54,7 +54,7 @@
         }
         
         /* Strategy Switch Overlay */
-        #strategy-overlay, #backtest-overlay {
+        #strategy-overlay, #backtest-overlay, #strategy-doc-overlay {
             position: fixed;
             top: 0;
             left: 0;
@@ -72,7 +72,7 @@
             transition: opacity 0.3s ease;
         }
         
-        #strategy-overlay.active, #backtest-overlay.active {
+        #strategy-overlay.active, #backtest-overlay.active, #strategy-doc-overlay.active {
             opacity: 1;
             pointer-events: all;
         }
@@ -159,16 +159,16 @@
     <!-- Strategy Switch Overlay -->
     <div id="strategy-overlay">
         <div class="cyber-loader mb-4"></div>
-        <div class="text-xl font-bold text-white tracking-widest animate-pulse">STRATEGY SWITCHING...</div>
-        <div class="text-xs text-trading-blue font-mono mt-2" id="overlay-text">Reconfiguring Neural Networks</div>
+        <div class="text-xl font-bold text-white tracking-widest animate-pulse">策略切换中...</div>
+        <div class="text-xs text-trading-blue font-mono mt-2" id="overlay-text">正在重建策略上下文</div>
     </div>
 
     <!-- Backtest Overlay -->
     <div id="backtest-overlay">
         <div id="backtest-progress-container" class="flex flex-col items-center">
             <div class="cyber-loader mb-4"></div>
-            <div class="text-xl font-bold text-white tracking-widest animate-pulse">SYSTEM BACKTESTING...</div>
-            <div class="text-xs text-trading-blue font-mono mt-2" id="backtest-status-text">Initializing historical data...</div>
+            <div class="text-xl font-bold text-white tracking-widest animate-pulse">系统回测中...</div>
+            <div class="text-xs text-trading-blue font-mono mt-2" id="backtest-status-text">正在初始化历史数据...</div>
             <div class="w-64 h-2 bg-slate-800 rounded-full mt-4 overflow-hidden">
                 <div class="h-full bg-trading-blue transition-all duration-300" id="backtest-progress-bar" style="width: 0%"></div>
             </div>
@@ -226,6 +226,31 @@
         </div>
     </div>
 
+    <div id="strategy-doc-overlay">
+        <div class="bg-slate-900/95 border border-slate-700 rounded-lg p-5 w-[900px] max-w-[92vw] max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-3">
+                <div class="text-lg font-bold text-white"><i class="fa-solid fa-book-open text-indigo-400 mr-2"></i>策略说明手册</div>
+                <button onclick="closeStrategyDocs()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="text-xs text-slate-400 mb-3">用于快速回忆策略逻辑、适用场景和示例，不影响实时运行。</div>
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-xs text-slate-400">查看策略</span>
+                <select id="strategy-doc-selector" onchange="renderStrategyDoc(this.value)" class="bg-slate-800 border border-slate-600 text-white py-1 px-2 rounded text-xs">
+                    <option value="all">全部策略总览</option>
+                    <option value="01">01 三周期共振波段</option>
+                    <option value="02">02 短线弱转强烂板</option>
+                    <option value="03">03 ETF行业轮动</option>
+                    <option value="04">04 龙头首阴反包</option>
+                    <option value="05">05 3N法则主升浪</option>
+                    <option value="06">06 海豚交易法</option>
+                    <option value="07">07 跳空交易系统</option>
+                    <option value="08">08 神奇九转</option>
+                </select>
+            </div>
+            <div id="strategy-doc-content" class="space-y-3"></div>
+        </div>
+    </div>
+
     <!-- Top Navigation Bar -->
     <header class="h-16 border-b border-slate-700 bg-trading-bg flex items-center justify-between px-6 z-20 shadow-lg">
         <div class="flex items-center gap-4">
@@ -278,6 +303,9 @@
             </div>
             <button onclick="reloadStrategies()" class="bg-trading-blue hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs transition-all border border-blue-500">
                 <i class="fa-solid fa-rotate"></i> 热更新策略
+            </button>
+            <button onclick="openStrategyDocs()" class="bg-violet-600 hover:bg-violet-500 text-white px-3 py-1.5 rounded text-xs transition-all border border-violet-500">
+                <i class="fa-solid fa-book"></i> 策略说明
             </button>
             <a href="/report" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs transition-all border border-indigo-500">
                 <i class="fa-solid fa-file-lines"></i> 打开报告
@@ -464,6 +492,13 @@
             </div>
 
             <div class="glass-panel rounded-lg p-3 border border-slate-700/70">
+                <div class="text-xs uppercase tracking-widest text-slate-400 mb-1">当前策略文字说明</div>
+                <div id="strategy-quick-name" class="text-sm font-bold text-white mb-1">全部策略总览</div>
+                <div id="strategy-quick-logic" class="text-[11px] text-slate-300">多策略协同：并行生成信号，由风控统一审核执行。</div>
+                <div id="strategy-quick-example" class="text-[10px] text-slate-500 mt-1">示例：当07与01同向看多时，信号一致性提升。</div>
+            </div>
+
+            <div class="glass-panel rounded-lg p-3 border border-slate-700/70">
                 <div class="flex items-center justify-between mb-2">
                     <div class="text-xs uppercase tracking-widest text-slate-400">Live 控制台</div>
                     <span id="live-run-state" class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-200">待机</span>
@@ -621,6 +656,62 @@
             riskRejects: [],
             recentPnls: []
         };
+        const STRATEGY_GUIDE = {
+            all: {
+                name: '全部策略总览',
+                logic: '多策略并行生成信号，按周期触发后统一进入风控审核与执行。',
+                effect: '适合先观察整体系统状态，避免单策略偏差。',
+                example: '示例：若07与01同向看多，信号一致性会提升；若分歧明显，置信度会下降。'
+            },
+            '01': {
+                name: '01 三周期共振波段',
+                logic: '结合周线趋势、日线均线和60分钟MACD共振，寻找中短趋势切入点。',
+                effect: '趋势段表现通常更稳定，信号频率中等。',
+                example: '示例：周线MA20抬升 + 日线贴近MA10 + 60分钟金叉放量时触发买入。'
+            },
+            '02': {
+                name: '02 短线弱转强烂板',
+                logic: '偏短线博弈策略，持有时间较短，重视次日强弱转换。',
+                effect: '交易节奏快，更多用于短线试错。',
+                example: '示例：弱势后出现转强迹象，策略尝试小仓位切入并快速退出。'
+            },
+            '03': {
+                name: '03 ETF行业轮动',
+                logic: '基于日线MA10趋势判定，站上均线参与，跌破均线离场。',
+                effect: '信号较慢，适合趋势延续行情。',
+                example: '示例：日线收盘上穿MA10后建仓，后续跌回MA10下方平仓。'
+            },
+            '04': {
+                name: '04 龙头首阴反包',
+                logic: '围绕龙头股首阴后的反包结构进行识别。',
+                effect: '触发条件严格，信号稀疏。',
+                example: '示例：强势龙头出现首阴后次日放量反包，进入候选触发。'
+            },
+            '05': {
+                name: '05 3N法则主升浪',
+                logic: '关注30分钟级别MACD与量能共振，捕捉主升阶段。',
+                effect: '在趋势加速段更容易给出有效信号。',
+                example: '示例：30分钟DIF>DEA且量能超过近5周期均量1.5倍时尝试开仓。'
+            },
+            '06': {
+                name: '06 海豚交易法',
+                logic: '1分钟MA26趋势过滤 + MACD水上金叉，配合1%追踪止损。',
+                effect: '信号较活跃，回撤控制依赖止损执行。',
+                example: '示例：价格在MA26上方且MACD金叉后开仓，创新高后抬升追踪止损。'
+            },
+            '07': {
+                name: '07 跳空交易系统',
+                logic: '15分钟级别识别跳空低开后的阳线反转，结合追踪止损。',
+                effect: '在波动较大的个股上更活跃。',
+                example: '示例：15分钟低开后收阳形成反转信号，随后按1%追踪止损管理。'
+            },
+            '08': {
+                name: '08 神奇九转',
+                logic: '基于序列计数寻找拐点，入场后用追踪止损保护利润。',
+                effect: '更偏向拐点反转捕捉，信号质量依赖波动结构。',
+                example: '示例：满足九转买入条件后入场，若后续回落触发追踪止损则退出。'
+            }
+        };
         
         ws.onopen = () => {
             console.log('Connected to Cabinet');
@@ -747,6 +838,7 @@
             allOpt.innerText = '★ 全策略协同 (All Active)';
             allOpt.selected = true;
             selector.prepend(allOpt);
+            updateStrategyQuick('all');
         }
 
         function startSimulation() {
@@ -1040,16 +1132,17 @@
         function switchStrategy(val) {
             if (val === 'waiting' || val === 'loading') return;
             const steps = [
-                "Disconnecting current signals...",
-                "Loading strategy parameters...",
-                "Initializing indicators...",
-                "Reconnecting to Menxia Sheng...",
-                "Strategy ONLINE"
+                "正在断开当前策略信号...",
+                "正在加载目标策略参数...",
+                "正在初始化指标缓存...",
+                "正在重连风控与执行链路...",
+                "策略切换完成"
             ];
             playOverlaySteps(steps, () => {
                 logMessage('SYSTEM', `策略切换完成: ${val}`, 'success');
             });
             ws.send(JSON.stringify({ type: 'switch_strategy', id: val }));
+            updateStrategyQuick(val);
         }
 
         function playOverlaySteps(steps, onDone) {
@@ -1076,11 +1169,11 @@
             const sourceSel = document.getElementById('source-select');
             if (!sourceSel) return;
             const steps = [
-                "Preparing data-source hot swap...",
-                `Target provider: ${source}`,
-                "Restarting live runtime context...",
-                "Validating provider heartbeat...",
-                "Source ONLINE"
+                "正在准备数据源热切换...",
+                `目标数据源：${source}`,
+                "正在重启实时运行上下文...",
+                "正在校验数据源可用性...",
+                "数据源切换完成"
             ];
             playOverlaySteps(steps, () => {
                 logMessage('SYSTEM', `数据源切换生效: ${source}`, 'success');
@@ -1127,7 +1220,7 @@
             progressContainer.classList.remove('hidden');
             resultsDiv.classList.add('hidden');
             document.getElementById('backtest-progress-bar').style.width = '0%';
-            document.getElementById('backtest-status-text').innerText = 'Initializing...';
+            document.getElementById('backtest-status-text').innerText = '正在初始化...';
             strategyReportsBuffer = [];
             document.getElementById('bt-strategy-reports').innerHTML = '';
             
@@ -1191,7 +1284,56 @@
             const { progress, current_date } = data;
             document.getElementById('backtest-progress-bar').style.width = `${progress}%`;
             document.getElementById('backtest-date-display').innerText = current_date;
-            document.getElementById('backtest-status-text').innerText = `Simulating Market Data... ${progress}%`;
+            document.getElementById('backtest-status-text').innerText = `正在模拟市场数据... ${progress}%`;
+        }
+
+        function openStrategyDocs() {
+            const overlay = document.getElementById('strategy-doc-overlay');
+            const selector = document.getElementById('strategy-doc-selector');
+            const current = document.getElementById('strategy-selector')?.value || 'all';
+            if (selector) selector.value = current in STRATEGY_GUIDE ? current : 'all';
+            renderStrategyDoc(selector?.value || 'all');
+            if (overlay) overlay.classList.add('active');
+        }
+
+        function closeStrategyDocs() {
+            const overlay = document.getElementById('strategy-doc-overlay');
+            if (overlay) overlay.classList.remove('active');
+        }
+
+        function renderStrategyDoc(strategyId) {
+            const target = document.getElementById('strategy-doc-content');
+            if (!target) return;
+            if (strategyId === 'all') {
+                const ids = ['01','02','03','04','05','06','07','08'];
+                target.innerHTML = ids.map(id => {
+                    const d = STRATEGY_GUIDE[id];
+                    return `<div class="bg-slate-800/70 border border-slate-700 rounded p-3">
+                        <div class="text-white font-bold mb-1">${d.name}</div>
+                        <div class="text-slate-300 text-xs">逻辑：${d.logic}</div>
+                        <div class="text-slate-300 text-xs mt-1">效果：${d.effect}</div>
+                        <div class="text-slate-500 text-[11px] mt-1">${d.example}</div>
+                    </div>`;
+                }).join('');
+                return;
+            }
+            const d = STRATEGY_GUIDE[strategyId] || STRATEGY_GUIDE.all;
+            target.innerHTML = `<div class="bg-slate-800/70 border border-slate-700 rounded p-4">
+                <div class="text-white text-base font-bold mb-2">${d.name}</div>
+                <div class="text-slate-300 text-sm mb-2"><span class="text-slate-400">逻辑：</span>${d.logic}</div>
+                <div class="text-slate-300 text-sm mb-2"><span class="text-slate-400">效果：</span>${d.effect}</div>
+                <div class="text-slate-300 text-sm"><span class="text-slate-400">示例：</span>${d.example}</div>
+            </div>`;
+        }
+
+        function updateStrategyQuick(strategyId) {
+            const d = STRATEGY_GUIDE[strategyId] || STRATEGY_GUIDE.all;
+            const name = document.getElementById('strategy-quick-name');
+            const logic = document.getElementById('strategy-quick-logic');
+            const example = document.getElementById('strategy-quick-example');
+            if (name) name.innerText = d.name;
+            if (logic) logic.innerText = `逻辑：${d.logic} 效果：${d.effect}`;
+            if (example) example.innerText = d.example;
         }
         
         function showBacktestResults(data) {
