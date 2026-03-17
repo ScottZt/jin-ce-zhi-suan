@@ -336,13 +336,14 @@
             <div class="glass-panel p-4 rounded-lg flex-1 flex flex-col relative overflow-hidden group hover:border-trading-blue/30 transition-colors">
                 <div class="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity"><i class="fa-solid fa-scroll text-6xl"></i></div>
                 <div class="flex justify-between items-start mb-2">
-                    <h3 class="font-bold text-trading-blue text-sm">策略研究中心 (Strategy Center)</h3>
+                    <h3 class="font-bold text-trading-blue text-sm">中书省 - 策略研究中心</h3>
                     <div class="flex items-center gap-2">
                         <span class="status-dot bg-trading-green animate-pulse" id="status-zhongshu"></span>
                         <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">真实联动</span>
                     </div>
                 </div>
-                <div class="text-[10px] text-slate-400 mb-1">职责: 策略生成与草拟 (Strategy Gen)</div>
+                <div class="text-[10px] text-slate-400 mb-1">职责: 策略生成与草拟</div>
+                <div class="text-[10px] text-slate-500 mb-1">参数: 激活策略 <span id="cfg-zhongshu-active" class="text-slate-300">--</span>，09箱体周期 <span id="cfg-zhongshu-box" class="text-slate-300">--</span></div>
                 <div class="flex-1 bg-slate-900/50 rounded border border-slate-700/50 p-3 font-mono text-xs overflow-y-auto" id="log-zhongshu">
                     <span class="text-slate-500">> 等待指令...</span>
                 </div>
@@ -352,13 +353,14 @@
             <div class="glass-panel p-4 rounded-lg flex-1 flex flex-col relative overflow-hidden group hover:border-trading-yellow/30 transition-colors">
                 <div class="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity"><i class="fa-solid fa-scale-balanced text-6xl"></i></div>
                 <div class="flex justify-between items-start mb-2">
-                    <h3 class="font-bold text-trading-yellow text-sm">风控审核中心 (Risk Control Center)</h3>
+                    <h3 class="font-bold text-trading-yellow text-sm">门下省 - 风控审核中心</h3>
                     <div class="flex items-center gap-2">
                         <span class="status-dot bg-trading-yellow" id="status-menxia"></span>
                         <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">真实联动</span>
                     </div>
                 </div>
-                <div class="text-[10px] text-slate-400 mb-1">职责: 风控审核与驳回 (Risk Audit)</div>
+                <div class="text-[10px] text-slate-400 mb-1">职责: 风控审核与驳回</div>
+                <div class="text-[10px] text-slate-500 mb-1">参数: 单笔止损 <span id="cfg-menxia-stop" class="text-slate-300">--</span>，日亏熔断 <span id="cfg-menxia-dayloss" class="text-slate-300">--</span></div>
                 <div class="flex-1 bg-slate-900/50 rounded border border-slate-700/50 p-3 font-mono text-xs overflow-y-auto" id="log-menxia">
                     <span class="text-slate-500">> 监控中...</span>
                 </div>
@@ -368,13 +370,14 @@
             <div class="glass-panel p-4 rounded-lg flex-1 flex flex-col relative overflow-hidden group hover:border-trading-red/30 transition-colors">
                 <div class="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity"><i class="fa-solid fa-gavel text-6xl"></i></div>
                 <div class="flex justify-between items-start mb-2">
-                    <h3 class="font-bold text-trading-red text-sm">指令执行中心 (Execution Center)</h3>
+                    <h3 class="font-bold text-trading-red text-sm">尚书省 - 指令执行中心</h3>
                     <div class="flex items-center gap-2">
                         <span class="status-dot bg-slate-500" id="status-shangshu"></span>
                         <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">真实联动</span>
                     </div>
                 </div>
-                <div class="text-[10px] text-slate-400 mb-1">职责: 指令调度与执行 (Execution)</div>
+                <div class="text-[10px] text-slate-400 mb-1">职责: 指令调度与执行</div>
+                <div class="text-[10px] text-slate-500 mb-1">参数: 执行滑点 <span id="cfg-shangshu-slippage" class="text-slate-300">--</span>，模式 <span id="cfg-shangshu-mode" class="text-slate-300">--</span></div>
                 <div class="flex-1 bg-slate-900/50 rounded border border-slate-700/50 p-3 font-mono text-xs overflow-y-auto" id="log-shangshu">
                     <span class="text-slate-500">> 就绪...</span>
                 </div>
@@ -395,10 +398,11 @@
                 <!-- Li Bu (Personnel) -->
                 <div id="panel-li" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-purple-500">
                     <div class="flex justify-between items-center">
-                        <div class="flex items-center gap-2 text-purple-400 font-bold"><i class="fa-solid fa-users-gear"></i> 资金部 (Capital)</div>
+                        <div class="flex items-center gap-2 text-purple-400 font-bold"><i class="fa-solid fa-users-gear"></i> 吏部 - 资金部</div>
                         <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Active</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">仓位管理 & 策略分配</div>
+                    <div class="text-[10px] text-slate-500 mt-1">参数: 初始资金 <span id="cfg-li-capital" class="text-slate-300">--</span></div>
                     <div class="mt-2 grid grid-cols-2 gap-2">
                         <div class="bg-slate-900/80 p-2 rounded">
                             <div class="text-[10px] text-slate-400">主力策略</div>
@@ -414,10 +418,11 @@
                 <!-- Hu Bu (Revenue) -->
                 <div id="panel-hu" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-yellow-500">
                     <div class="flex justify-between items-center">
-                        <div class="flex items-center gap-2 text-trading-yellow font-bold"><i class="fa-solid fa-coins"></i> 交易部 (Trading)</div>
+                        <div class="flex items-center gap-2 text-trading-yellow font-bold"><i class="fa-solid fa-coins"></i> 户部 - 交易部</div>
                         <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Audit</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">资金核算 & 盈亏统计</div>
+                    <div class="text-[10px] text-slate-500 mt-1">参数: 手续费率 <span id="cfg-hu-commission" class="text-slate-300">--</span>，最低费 <span id="cfg-hu-minc" class="text-slate-300">--</span></div>
                     <div class="mt-2 flex items-baseline gap-2">
                         <span class="text-2xl font-mono font-bold text-white" id="revenue-cash">452,000</span>
                         <span class="text-xs text-slate-400">可用现金 (Cash)</span>
@@ -430,10 +435,11 @@
                 <!-- Li Bu (Rites) -->
                 <div id="panel-li-rites" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-blue-400">
                     <div class="flex justify-between items-center">
-                        <div class="flex items-center gap-2 text-blue-400 font-bold"><i class="fa-solid fa-book-journal-whills"></i> 合规部 (Compliance)</div>
+                        <div class="flex items-center gap-2 text-blue-400 font-bold"><i class="fa-solid fa-book-journal-whills"></i> 礼部 - 合规部</div>
                         <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Monitor</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">市场情绪 & 交易合规</div>
+                    <div class="text-[10px] text-slate-500 mt-1">参数: Live开关 <span id="cfg-li-rites-live" class="text-slate-300">--</span></div>
                     <div class="mt-2 font-mono text-sm">
                         <div>市场温度: <span class="text-trading-red" id="rites-market-temp">🔥 78 (Hot)</span></div>
                         <div>合规检查: <span class="text-trading-green" id="rites-compliance-status">PASS</span></div>
@@ -444,10 +450,11 @@
                 <div id="panel-bing" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-red-600 relative overflow-hidden">
                     <div class="absolute -right-4 -bottom-4 text-red-900/20 text-8xl"><i class="fa-solid fa-crosshairs"></i></div>
                     <div class="flex justify-between items-center relative z-10">
-                        <div class="flex items-center gap-2 text-red-500 font-bold"><i class="fa-solid fa-person-rifle"></i> 操盘部 (Operation)</div>
+                        <div class="flex items-center gap-2 text-red-500 font-bold"><i class="fa-solid fa-person-rifle"></i> 兵部 - 操盘部</div>
                         <div class="text-[10px] bg-red-900/50 text-red-300 px-1 rounded animate-pulse">SIGNAL</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1 relative z-10">买卖信号执行</div>
+                    <div class="text-[10px] text-slate-500 mt-1 relative z-10">参数: 滑点 <span id="cfg-bing-slippage" class="text-slate-300">--</span></div>
                     <div class="mt-2 relative z-10 bg-slate-900/80 p-2 rounded border border-red-900/30">
                         <div class="flex justify-between text-xs">
                             <span class="text-slate-400">Action</span>
@@ -463,10 +470,11 @@
                 <!-- Xing Bu (Justice) -->
                 <div id="panel-xing" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-orange-600">
                     <div class="flex justify-between items-center">
-                        <div class="flex items-center gap-2 text-orange-500 font-bold"><i class="fa-solid fa-gavel"></i> 风控部 (Risk)</div>
+                        <div class="flex items-center gap-2 text-orange-500 font-bold"><i class="fa-solid fa-gavel"></i> 刑部 - 风控部</div>
                         <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Guard</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">风控强平 & 违规惩戒</div>
+                    <div class="text-[10px] text-slate-500 mt-1">参数: 总仓上限 <span id="cfg-xing-totalpos" class="text-slate-300">--</span></div>
                     <div class="mt-2 space-y-1">
                         <div class="flex justify-between text-xs">
                             <span>回撤限制</span>
@@ -482,10 +490,11 @@
                 <!-- Gong Bu (Works) -->
                 <div id="panel-gong" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-cyan-500">
                     <div class="flex justify-between items-center">
-                        <div class="flex items-center gap-2 text-cyan-400 font-bold"><i class="fa-solid fa-industry"></i> 数据运维部 (Data Ops)</div>
+                        <div class="flex items-center gap-2 text-cyan-400 font-bold"><i class="fa-solid fa-industry"></i> 工部 - 数据部 / 运维部</div>
                         <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Sync</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">数据清洗 & 指标计算</div>
+                    <div class="text-[10px] text-slate-500 mt-1">参数: 数据源 <span id="cfg-gong-source" class="text-slate-300">--</span>，回退 <span id="cfg-gong-fallback" class="text-slate-300">--</span></div>
                     <div class="mt-2 grid grid-cols-3 gap-1 text-center text-[10px] font-mono">
                         <div class="bg-slate-900 p-1 rounded">
                             <div class="text-slate-500">MA5</div>
@@ -1420,6 +1429,49 @@
             return cur;
         }
 
+        function setText(id, text) {
+            const el = document.getElementById(id);
+            if (el) el.innerText = text;
+        }
+
+        function fmtPct(v, digits = 2) {
+            const n = Number(v);
+            if (!Number.isFinite(n)) return '--';
+            return `${(n * 100).toFixed(digits)}%`;
+        }
+
+        function applyConfigToBoards(cfg) {
+            if (!cfg || typeof cfg !== 'object') return;
+            const active = getByPath(cfg, 'strategies.active_ids', []);
+            const activeText = Array.isArray(active) ? `${active.length}个 (${active.join(',')})` : '--';
+            setText('cfg-zhongshu-active', activeText);
+            setText('cfg-zhongshu-box', `${getByPath(cfg, 'strategy_params.09.box_period', '--')}`);
+            setText('cfg-menxia-stop', fmtPct(getByPath(cfg, 'risk_control.max_stop_loss_pct', null)));
+            setText('cfg-menxia-dayloss', fmtPct(getByPath(cfg, 'risk_control.max_daily_loss_pct', null)));
+            setText('cfg-shangshu-slippage', fmtPct(getByPath(cfg, 'execution.slippage', null), 3));
+            setText('cfg-shangshu-mode', `${getByPath(cfg, 'system.mode', '--')}`);
+            setText('cfg-li-capital', `¥ ${Number(getByPath(cfg, 'system.initial_capital', 0)).toLocaleString()}`);
+            setText('cfg-hu-commission', `${Number(getByPath(cfg, 'trading_cost.commission_rate', 0)).toFixed(6)}`);
+            setText('cfg-hu-minc', `¥ ${Number(getByPath(cfg, 'trading_cost.min_commission', 0)).toFixed(2)}`);
+            setText('cfg-li-rites-live', getByPath(cfg, 'system.enable_live', false) ? '开启' : '关闭');
+            setText('cfg-bing-slippage', fmtPct(getByPath(cfg, 'execution.slippage', null), 3));
+            setText('cfg-xing-totalpos', fmtPct(getByPath(cfg, 'risk_control.max_total_pos', null)));
+            setText('cfg-gong-source', `${getByPath(cfg, 'data_provider.source', '--')}`);
+            setText('cfg-gong-fallback', getByPath(cfg, 'data_provider.enable_fallback', false) ? 'ON' : 'OFF');
+            setText('justice-dd-limit', fmtPct(getByPath(cfg, 'risk_control.max_daily_loss_pct', null)));
+        }
+
+        async function syncBoardConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    configDraft = data.config || configDraft;
+                    applyConfigToBoards(configDraft);
+                }
+            } catch (_) {}
+        }
+
         function setByPath(obj, path, value) {
             const parts = path.split('.');
             let cur = obj;
@@ -1650,6 +1702,7 @@
                 if (data.status !== 'success') throw new Error(data.msg || '读取配置失败');
                 configDraft = data.config || {};
                 renderConfigForm(configDraft);
+                applyConfigToBoards(configDraft);
                 if (status) status.innerText = '已加载';
             } catch (e) {
                 if (status) status.innerText = `读取失败: ${e}`;
@@ -1668,6 +1721,8 @@
                 });
                 const data = await res.json();
                 if (data.status !== 'success') throw new Error(data.msg || '保存失败');
+                configDraft = parsed;
+                applyConfigToBoards(configDraft);
                 if (status) status.innerText = '保存成功，已生效';
                 await syncStatus();
                 logMessage('SYSTEM', '配置保存成功并已生效', 'success');
@@ -1687,6 +1742,7 @@
                 if (sourceSel && data.provider_source) sourceSel.value = data.provider_source;
                 applyLiveVisibility();
                 renderLiveStatus();
+                await syncBoardConfig();
             } catch (_) {}
         }
 

@@ -1,6 +1,74 @@
 {
   "reports": [
     {
+      "report_id": "737199",
+      "created_at": "2026-03-17T14:35:25",
+      "stock_code": "000931.SZ",
+      "strategy_id": "09",
+      "summary": {
+        "stock": "000931.SZ",
+        "period": "2025-03-17 - 2026-03-17",
+        "ranking": [
+          {
+            "strategy_id": "09",
+            "total_pnl": 0,
+            "roi": 0.0,
+            "annualized_roi": 0.0,
+            "max_dd": 0.0,
+            "win_rate": 0.0,
+            "profit_factor": Infinity,
+            "total_trades": 0,
+            "rejections": 0,
+            "violations": 0,
+            "circuit_breaks": 0,
+            "calmar": 0.0,
+            "sharpe": 0.0,
+            "rank": 1,
+            "rating": "C"
+          }
+        ],
+        "total_trades": 0
+      },
+      "ranking": [
+        {
+          "strategy_id": "09",
+          "total_pnl": 0,
+          "roi": 0.0,
+          "annualized_roi": 0.0,
+          "max_dd": 0.0,
+          "win_rate": 0.0,
+          "profit_factor": Infinity,
+          "total_trades": 0,
+          "rejections": 0,
+          "violations": 0,
+          "circuit_breaks": 0,
+          "calmar": 0.0,
+          "sharpe": 0.0,
+          "rank": 1,
+          "rating": "C"
+        }
+      ],
+      "strategy_reports": {
+        "09": {
+          "strategy_id": "09",
+          "start_date": "2025-03-17",
+          "end_date": "2026-03-17",
+          "init_capital": 1000000.0,
+          "end_capital": 1000000.0,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "trade_count": 0,
+          "win_num": 0,
+          "loss_num": 0,
+          "win_rate": 0.0,
+          "avg_win": 0.0,
+          "avg_loss": 0.0,
+          "profit_ratio": 0.0
+        }
+      }
+    },
+    {
       "report_id": "301081",
       "created_at": "2026-03-17T14:28:09",
       "stock_code": "000931.SZ",
