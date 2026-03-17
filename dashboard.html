@@ -392,7 +392,7 @@
             
             <div class="grid grid-cols-2 grid-rows-3 gap-4 flex-1">
                 <!-- Li Bu (Personnel) -->
-                <div class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-purple-500">
+                <div id="panel-li" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-purple-500">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2 text-purple-400 font-bold"><i class="fa-solid fa-users-gear"></i> 资金部 (Capital)</div>
                         <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Active</div>
@@ -401,17 +401,17 @@
                     <div class="mt-2 grid grid-cols-2 gap-2">
                         <div class="bg-slate-900/80 p-2 rounded">
                             <div class="text-[10px] text-slate-400">主力策略</div>
-                            <div class="font-mono text-white">Strategy-05</div>
+                            <div class="font-mono text-white" id="personnel-main-strategy">Strategy-05</div>
                         </div>
                         <div class="bg-slate-900/80 p-2 rounded">
                             <div class="text-[10px] text-slate-400">可用仓位</div>
-                            <div class="font-mono text-purple-400">45%</div>
+                            <div class="font-mono text-purple-400" id="personnel-available-pos">45%</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Hu Bu (Revenue) -->
-                <div class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-yellow-500">
+                <div id="panel-hu" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-yellow-500">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2 text-trading-yellow font-bold"><i class="fa-solid fa-coins"></i> 交易部 (Trading)</div>
                         <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Audit</div>
@@ -427,20 +427,20 @@
                 </div>
 
                 <!-- Li Bu (Rites) -->
-                <div class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-blue-400">
+                <div id="panel-li-rites" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-blue-400">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2 text-blue-400 font-bold"><i class="fa-solid fa-book-journal-whills"></i> 合规部 (Compliance)</div>
                         <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Monitor</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">市场情绪 & 交易合规</div>
                     <div class="mt-2 font-mono text-sm">
-                        <div>市场温度: <span class="text-trading-red">🔥 78 (Hot)</span></div>
-                        <div>合规检查: <span class="text-trading-green">PASS</span></div>
+                        <div>市场温度: <span class="text-trading-red" id="rites-market-temp">🔥 78 (Hot)</span></div>
+                        <div>合规检查: <span class="text-trading-green" id="rites-compliance-status">PASS</span></div>
                     </div>
                 </div>
 
                 <!-- Bing Bu (War) -->
-                <div class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-red-600 relative overflow-hidden">
+                <div id="panel-bing" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-red-600 relative overflow-hidden">
                     <div class="absolute -right-4 -bottom-4 text-red-900/20 text-8xl"><i class="fa-solid fa-crosshairs"></i></div>
                     <div class="flex justify-between items-center relative z-10">
                         <div class="flex items-center gap-2 text-red-500 font-bold"><i class="fa-solid fa-person-rifle"></i> 操盘部 (Operation)</div>
@@ -460,7 +460,7 @@
                 </div>
 
                 <!-- Xing Bu (Justice) -->
-                <div class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-orange-600">
+                <div id="panel-xing" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-orange-600">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2 text-orange-500 font-bold"><i class="fa-solid fa-gavel"></i> 风控部 (Risk)</div>
                         <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Guard</div>
@@ -469,17 +469,17 @@
                     <div class="mt-2 space-y-1">
                         <div class="flex justify-between text-xs">
                             <span>回撤限制</span>
-                            <span class="font-mono text-white">2.0%</span>
+                            <span class="font-mono text-white" id="justice-dd-limit">2.0%</span>
                         </div>
                         <div class="flex justify-between text-xs">
                             <span>当前回撤</span>
-                            <span class="font-mono text-trading-green">0.45%</span>
+                            <span class="font-mono text-trading-green" id="justice-dd-current">0.45%</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Gong Bu (Works) -->
-                <div class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-cyan-500">
+                <div id="panel-gong" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-cyan-500">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2 text-cyan-400 font-bold"><i class="fa-solid fa-industry"></i> 数据运维部 (Data Ops)</div>
                         <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Sync</div>
@@ -608,12 +608,35 @@
             <button onclick="startBacktest()" class="bg-trading-blue hover:bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm transition-all shadow-[0_0_10px_rgba(59,130,246,0.3)] border border-blue-500">
                 <i class="fa-solid fa-play"></i> 立即回测
             </button>
+            <button onclick="openConfigCenter()" class="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-purple-500">
+                <i class="fa-solid fa-sliders"></i> 配置中心
+            </button>
             
             <button onclick="toggleDebugPanel()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-slate-600">
                 <i class="fa-solid fa-terminal"></i> 调试
             </button>
         </div>
     </footer>
+
+    <div id="config-modal" class="hidden fixed inset-0 bg-black/70 z-[140] flex items-center justify-center p-6">
+        <div class="w-[980px] max-w-[96vw] h-[78vh] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl flex flex-col overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                <div class="text-white font-bold"><i class="fa-solid fa-sliders mr-2 text-purple-400"></i>运行配置中心</div>
+                <button onclick="closeConfigCenter()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="px-4 py-2 text-xs text-slate-400 border-b border-slate-700">按模块表单编辑配置，保存后自动生效</div>
+            <div class="flex-1 p-4 overflow-y-auto">
+                <div id="config-form-container" class="space-y-4"></div>
+            </div>
+            <div class="px-4 py-3 border-t border-slate-700 flex items-center justify-between">
+                <div id="config-save-status" class="text-xs text-slate-400">未修改</div>
+                <div class="flex items-center gap-2">
+                    <button onclick="loadConfigCenter()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-xs border border-slate-600">重新加载</button>
+                    <button onclick="saveConfigCenter()" class="bg-purple-700 hover:bg-purple-600 text-white px-3 py-2 rounded text-xs border border-purple-500">保存并生效</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="debug-panel" class="hidden fixed right-4 bottom-20 w-[440px] max-w-[92vw] bg-slate-900/95 border border-slate-700 rounded-lg shadow-2xl z-[120] overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
@@ -676,6 +699,14 @@
             riskRejected: 0,
             riskRejects: [],
             recentPnls: []
+        };
+        const BT_STATE = {
+            progress: -1,
+            totalTrades: 0,
+            approvedSignals: 0,
+            rejectedSignals: 0,
+            latestPrice: null,
+            lastFlowAt: null
         };
         const STRATEGY_GUIDE = {
             all: {
@@ -833,20 +864,32 @@
                     break;
                 case 'market':
                     updateMarket(data);
+                    BT_STATE.latestPrice = Number(data.price || BT_STATE.latestPrice || 0);
+                    pulsePanel('panel-gong');
                     break;
                 case 'zhongshu':
                     updateCard('log-zhongshu', data.details, data.status);
                     logMessage('策略中心', data.msg, 'info');
+                    pulsePanel('status-zhongshu');
+                    pulsePanel('panel-li');
                     break;
                 case 'menxia':
                     updateCard('log-menxia', data.details, data.status);
                     logMessage('风控中心', data.msg, data.status.includes('green') ? 'success' : 'danger');
+                    pulsePanel('status-menxia');
+                    pulsePanel('panel-xing');
                     if (data.decision === 'approved') {
                         DIAG_STATE.riskApproved += 1;
+                        BT_STATE.approvedSignals += 1;
+                        document.getElementById('rites-compliance-status').innerText = 'PASS';
+                        document.getElementById('rites-compliance-status').className = 'text-trading-green';
                         updateConfidenceScore();
                     }
                     if (data.decision === 'rejected') {
                         DIAG_STATE.riskRejected += 1;
+                        BT_STATE.rejectedSignals += 1;
+                        document.getElementById('rites-compliance-status').innerText = 'REJECT';
+                        document.getElementById('rites-compliance-status').className = 'text-trading-red';
                         const item = `[${getTime()}] [${data.strategy_id || '--'}] ${data.reason || data.msg || '风控拒绝'}`;
                         DIAG_STATE.riskRejects.unshift(item);
                         DIAG_STATE.riskRejects = DIAG_STATE.riskRejects.slice(0, 5);
@@ -857,11 +900,22 @@
                 case 'shangshu':
                     updateCard('log-shangshu', data.details, data.status);
                     logMessage('执行中心', data.msg, 'warning');
+                    pulsePanel('status-shangshu');
+                    pulsePanel('panel-bing');
                     break;
                 case 'account':
                     if(data.assets) document.getElementById('total-assets').innerText = '¥ ' + parseFloat(data.assets).toLocaleString();
                     if(data.pnl) document.getElementById('daily-pnl').innerText = data.pnl;
                     if(data.pos_ratio) document.getElementById('position-ratio').innerText = data.pos_ratio;
+                    if (data.cash !== undefined) {
+                        const cashEl = document.getElementById('revenue-cash');
+                        if (cashEl) cashEl.innerText = Number(data.cash).toLocaleString();
+                    }
+                    if (data.pos_ratio) {
+                        const avail = document.getElementById('personnel-available-pos');
+                        if (avail) avail.innerText = `${(100 - Number(String(data.pos_ratio).replace('%','') || 0)).toFixed(1)}%`;
+                    }
+                    pulsePanel('panel-hu');
                     break;
                 case 'live_tick':
                     renderLiveTick(data);
@@ -878,9 +932,20 @@
                         if (DIAG_STATE.recentPnls.length > 20) DIAG_STATE.recentPnls.shift();
                         updateConfidenceScore();
                     }
+                    BT_STATE.totalTrades += 1;
+                    pulsePanel('panel-bing');
                     break;
                 case 'backtest_progress':
                     updateBacktestProgress(data);
+                    break;
+                case 'backtest_flow':
+                    renderBacktestFlow(data);
+                    break;
+                case 'backtest_trade':
+                    renderBacktestTrade(data);
+                    break;
+                case 'ministry_tick':
+                    updateMinistryTick(data);
                     break;
                 case 'backtest_result':
                     showBacktestResults(data);
@@ -897,6 +962,8 @@
                 SYSTEM_STATE.price = data.price;
             }
             if(data.ma5) document.getElementById('ind-ma5').innerText = parseFloat(data.ma5).toFixed(2);
+            if(data.macd !== undefined && data.macd !== null) document.getElementById('ind-macd').innerText = Number(data.macd).toFixed(3);
+            if(data.rsi !== undefined && data.rsi !== null) document.getElementById('ind-rsi').innerText = Number(data.rsi).toFixed(2);
         }
 
         function updateStrategyList(strategies) {
@@ -1246,6 +1313,348 @@
         }
         applyLiveVisibility();
         renderLiveStatus();
+        let configDraft = {};
+        const BIZ_SECTIONS = [
+            {
+                title: '系统总控',
+                subtitle: '运行模式与全局开关',
+                fields: [
+                    { path: 'system.mode', label: '运行模式', type: 'select', options: [{ value: 'backtest', label: 'backtest 回测' }, { value: 'live', label: 'live 实时' }] },
+                    { path: 'system.enable_live', label: '启用 Live', type: 'boolean' },
+                    { path: 'system.initial_capital', label: '系统初始资金', type: 'number', unit: '元', min: 10000, max: 100000000, step: 10000, slider: true },
+                    { path: 'system.log_level', label: '日志级别', type: 'select', options: [{ value: 'DEBUG', label: 'DEBUG' }, { value: 'INFO', label: 'INFO' }, { value: 'WARNING', label: 'WARNING' }, { value: 'ERROR', label: 'ERROR' }] }
+                ]
+            },
+            {
+                title: '太子院标的池',
+                subtitle: '标的列表与监控对象',
+                fields: [
+                    { path: 'targets', label: '监控标的列表', type: 'lines', itemType: 'string', hint: '每行一个股票代码，例如 301227.SZ' }
+                ]
+            },
+            {
+                title: '工部数据源',
+                subtitle: '主数据源与回退策略',
+                fields: [
+                    { path: 'data_provider.source', label: '主数据源', type: 'select', options: [{ value: 'default', label: 'default' }, { value: 'akshare', label: 'akshare' }, { value: 'tushare', label: 'tushare' }] },
+                    { path: 'data_provider.enable_fallback', label: '启用数据回退', type: 'boolean' },
+                    { path: 'data_provider.tushare_token', label: 'Tushare Token', type: 'text' },
+                    { path: 'data_provider.default_api_key', label: 'Default API Key', type: 'text' },
+                    { path: 'data_provider.default_api_url', label: 'Default API URL', type: 'text' }
+                ]
+            },
+            {
+                title: '吏部策略编组',
+                subtitle: '启用策略ID管理',
+                fields: [
+                    { path: 'strategies.active_ids', label: '激活策略ID', type: 'lines', itemType: 'string', hint: '每行一个策略ID，例如 01' }
+                ]
+            },
+            {
+                title: '门下省合规',
+                subtitle: '风控阈值配置',
+                fields: [
+                    { path: 'risk_control.max_stop_loss_pct', label: '单笔最大止损', type: 'number', unit: '%', min: 0.001, max: 0.3, step: 0.001, slider: true, scale: 100 },
+                    { path: 'risk_control.max_pos_per_stock', label: '单票最大仓位', type: 'number', unit: '%', min: 0.01, max: 1, step: 0.01, slider: true, scale: 100 },
+                    { path: 'risk_control.max_total_pos', label: '总仓位上限', type: 'number', unit: '%', min: 0.01, max: 1, step: 0.01, slider: true, scale: 100 },
+                    { path: 'risk_control.max_daily_loss_pct', label: '单日亏损熔断', type: 'number', unit: '%', min: 0.001, max: 0.2, step: 0.001, slider: true, scale: 100 }
+                ]
+            },
+            {
+                title: '户部成本',
+                subtitle: '手续费与税费模型',
+                fields: [
+                    { path: 'trading_cost.commission_rate', label: '手续费率', type: 'number', min: 0, max: 0.01, step: 0.00001, slider: true },
+                    { path: 'trading_cost.min_commission', label: '最低手续费', type: 'number', unit: '元', min: 0, max: 100, step: 0.1, slider: true },
+                    { path: 'trading_cost.stamp_duty', label: '印花税率', type: 'number', min: 0, max: 0.01, step: 0.00001, slider: true },
+                    { path: 'trading_cost.transfer_fee', label: '过户费率', type: 'number', min: 0, max: 0.001, step: 0.000001, slider: true }
+                ]
+            },
+            {
+                title: '兵部执行',
+                subtitle: '成交滑点与执行偏差',
+                fields: [
+                    { path: 'execution.slippage', label: '滑点比例', type: 'number', min: 0, max: 0.01, step: 0.0001, slider: true, scale: 100 }
+                ]
+            }
+        ];
+
+        const STRATEGY_FORM_GROUPS = [
+            { id: 'common', name: '公共参数', fields: [{ path: 'strategy_params.common.order_qty', label: '默认下单数量', type: 'number', min: 100, max: 100000, step: 100, slider: true }] },
+            { id: '01', name: '01 三周期共振', fields: [{ path: 'strategy_params.01.min_history_bars', label: '最小历史K线', type: 'number', min: 50, max: 5000, step: 10, slider: true }, { path: 'strategy_params.01.daily_ma10_tolerance', label: 'MA10偏离容忍', type: 'number', min: 0.001, max: 0.1, step: 0.001, slider: true, scale: 100 }, { path: 'strategy_params.01.volume_ma_window', label: '量能均线窗口', type: 'number', min: 2, max: 30, step: 1, slider: true }, { path: 'strategy_params.01.stop_loss_pct', label: '止损比例', type: 'number', min: 0.001, max: 0.2, step: 0.001, slider: true, scale: 100 }] },
+            { id: '02', name: '02 烂板战法', fields: [{ path: 'strategy_params.02.max_hold_bars', label: '最大持有Bar', type: 'number', min: 10, max: 5000, step: 10, slider: true }] },
+            { id: '03', name: '03 ETF轮动', fields: [{ path: 'strategy_params.03.stop_loss_pct', label: '止损比例', type: 'number', min: 0.001, max: 0.2, step: 0.001, slider: true, scale: 100 }] },
+            { id: '05', name: '05 3N主升浪', fields: [{ path: 'strategy_params.05.min_30m_bars', label: '最小30分钟K线', type: 'number', min: 10, max: 1000, step: 1, slider: true }, { path: 'strategy_params.05.volume_ma_window', label: '量能均线窗口', type: 'number', min: 2, max: 30, step: 1, slider: true }, { path: 'strategy_params.05.volume_multiple', label: '放量倍数', type: 'number', min: 1, max: 5, step: 0.1, slider: true }, { path: 'strategy_params.05.max_hold_bars', label: '最大持有Bar', type: 'number', min: 10, max: 5000, step: 10, slider: true }, { path: 'strategy_params.05.stop_loss_pct', label: '止损比例', type: 'number', min: 0.001, max: 0.2, step: 0.001, slider: true, scale: 100 }, { path: 'strategy_params.05.take_profit_pct', label: '止盈比例', type: 'number', min: 0.001, max: 0.5, step: 0.001, slider: true, scale: 100 }] },
+            { id: '06', name: '06 海豚交易法', fields: [{ path: 'strategy_params.06.min_history_bars', label: '最小历史K线', type: 'number', min: 10, max: 2000, step: 10, slider: true }, { path: 'strategy_params.06.ma_period', label: 'MA周期', type: 'number', min: 5, max: 120, step: 1, slider: true }, { path: 'strategy_params.06.trailing_stop_pct', label: '追踪止损', type: 'number', min: 0.001, max: 0.1, step: 0.001, slider: true, scale: 100 }, { path: 'strategy_params.06.stop_loss_pct', label: '初始止损', type: 'number', min: 0.001, max: 0.1, step: 0.001, slider: true, scale: 100 }] },
+            { id: '07', name: '07 跳空交易', fields: [{ path: 'strategy_params.07.min_15m_bars', label: '最小15分钟K线', type: 'number', min: 10, max: 1000, step: 1, slider: true }, { path: 'strategy_params.07.gap_down_multiplier', label: '低开阈值系数', type: 'number', min: 0.95, max: 1, step: 0.0005, slider: true }, { path: 'strategy_params.07.trailing_stop_pct', label: '追踪止损', type: 'number', min: 0.001, max: 0.1, step: 0.001, slider: true, scale: 100 }, { path: 'strategy_params.07.stop_loss_pct', label: '初始止损', type: 'number', min: 0.001, max: 0.1, step: 0.001, slider: true, scale: 100 }] },
+            { id: '08', name: '08 神奇九转', fields: [{ path: 'strategy_params.08.min_history_bars', label: '最小历史K线', type: 'number', min: 10, max: 1000, step: 1, slider: true }, { path: 'strategy_params.08.trailing_stop_pct', label: '追踪止损', type: 'number', min: 0.001, max: 0.1, step: 0.001, slider: true, scale: 100 }, { path: 'strategy_params.08.stop_loss_pct', label: '初始止损', type: 'number', min: 0.001, max: 0.1, step: 0.001, slider: true, scale: 100 }] }
+        ];
+
+        function getByPath(obj, path, fallback = undefined) {
+            const parts = path.split('.');
+            let cur = obj;
+            for (const p of parts) {
+                if (cur === null || cur === undefined || !(p in cur)) return fallback;
+                cur = cur[p];
+            }
+            return cur;
+        }
+
+        function setByPath(obj, path, value) {
+            const parts = path.split('.');
+            let cur = obj;
+            for (let i = 0; i < parts.length - 1; i++) {
+                const p = parts[i];
+                if (!(p in cur) || cur[p] === null || typeof cur[p] !== 'object') cur[p] = {};
+                cur = cur[p];
+            }
+            cur[parts[parts.length - 1]] = value;
+        }
+
+        function createFieldRow(labelText) {
+            const row = document.createElement('div');
+            row.className = 'grid grid-cols-[220px_1fr] gap-3 items-center bg-slate-950/60 border border-slate-700 rounded p-2';
+            const label = document.createElement('div');
+            label.className = 'text-[12px] text-slate-200';
+            label.innerText = labelText;
+            row.appendChild(label);
+            const holder = document.createElement('div');
+            row.appendChild(holder);
+            return { row, holder };
+        }
+
+        function createBusinessField(field, cfg) {
+            const { row, holder } = createFieldRow(field.label);
+            const value = getByPath(cfg, field.path, field.default);
+            if (field.type === 'boolean') {
+                const wrap = document.createElement('label');
+                wrap.className = 'inline-flex items-center gap-2 text-xs text-slate-200';
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.className = 'accent-purple-500';
+                input.checked = !!value;
+                input.dataset.path = field.path;
+                input.dataset.kind = 'value';
+                input.dataset.valueType = 'boolean';
+                const txt = document.createElement('span');
+                txt.innerText = input.checked ? '开启' : '关闭';
+                input.addEventListener('change', () => txt.innerText = input.checked ? '开启' : '关闭');
+                wrap.appendChild(input);
+                wrap.appendChild(txt);
+                holder.appendChild(wrap);
+            } else if (field.type === 'select') {
+                const sel = document.createElement('select');
+                sel.className = 'w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500';
+                sel.dataset.path = field.path;
+                sel.dataset.kind = 'value';
+                sel.dataset.valueType = 'string';
+                (field.options || []).forEach(opt => {
+                    const o = document.createElement('option');
+                    o.value = opt.value;
+                    o.innerText = opt.label;
+                    sel.appendChild(o);
+                });
+                sel.value = value ?? '';
+                holder.appendChild(sel);
+            } else if (field.type === 'lines') {
+                const area = document.createElement('textarea');
+                area.className = 'w-full min-h-[72px] bg-slate-900 border border-slate-700 rounded p-2 text-xs font-mono text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500';
+                area.dataset.path = field.path;
+                area.dataset.kind = 'lines';
+                area.dataset.itemType = field.itemType || 'string';
+                area.value = Array.isArray(value) ? value.map(v => String(v)).join('\n') : '';
+                holder.appendChild(area);
+                if (field.hint) {
+                    const hint = document.createElement('div');
+                    hint.className = 'text-[10px] text-slate-500 mt-1';
+                    hint.innerText = field.hint;
+                    holder.appendChild(hint);
+                }
+            } else {
+                const wrap = document.createElement('div');
+                wrap.className = 'space-y-1';
+                const line = document.createElement('div');
+                line.className = 'flex items-center gap-2';
+                if (field.slider) {
+                    const range = document.createElement('input');
+                    range.type = 'range';
+                    range.min = String(field.min ?? 0);
+                    range.max = String(field.max ?? 1);
+                    range.step = String(field.step ?? 0.001);
+                    range.value = String(typeof value === 'number' ? value : Number(value || 0));
+                    range.className = 'w-full accent-purple-500';
+                    line.appendChild(range);
+                    const num = document.createElement('input');
+                    num.type = 'number';
+                    num.min = field.min !== undefined ? String(field.min) : undefined;
+                    num.max = field.max !== undefined ? String(field.max) : undefined;
+                    num.step = String(field.step ?? 'any');
+                    num.value = String(value ?? field.default ?? 0);
+                    num.dataset.path = field.path;
+                    num.dataset.kind = 'value';
+                    num.dataset.valueType = field.type === 'number' ? 'number' : 'string';
+                    num.className = 'w-36 bg-slate-900 border border-slate-700 rounded p-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500';
+                    range.addEventListener('input', () => num.value = range.value);
+                    num.addEventListener('input', () => {
+                        const v = Number(num.value);
+                        if (Number.isFinite(v)) range.value = String(v);
+                    });
+                    line.appendChild(num);
+                    if (field.unit) {
+                        const unit = document.createElement('span');
+                        unit.className = 'text-[11px] text-slate-400';
+                        unit.innerText = field.unit;
+                        line.appendChild(unit);
+                    }
+                } else {
+                    const input = document.createElement('input');
+                    input.type = field.type === 'number' ? 'number' : 'text';
+                    input.min = field.min !== undefined ? String(field.min) : undefined;
+                    input.max = field.max !== undefined ? String(field.max) : undefined;
+                    input.step = field.type === 'number' ? String(field.step ?? 'any') : undefined;
+                    input.value = String(value ?? field.default ?? '');
+                    input.dataset.path = field.path;
+                    input.dataset.kind = 'value';
+                    input.dataset.valueType = field.type === 'number' ? 'number' : 'string';
+                    input.className = 'w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500';
+                    line.appendChild(input);
+                    if (field.unit) {
+                        const unit = document.createElement('span');
+                        unit.className = 'text-[11px] text-slate-400';
+                        unit.innerText = field.unit;
+                        line.appendChild(unit);
+                    }
+                }
+                wrap.appendChild(line);
+                if (field.desc) {
+                    const desc = document.createElement('div');
+                    desc.className = 'text-[10px] text-slate-500';
+                    desc.innerText = field.desc;
+                    wrap.appendChild(desc);
+                }
+                holder.appendChild(wrap);
+            }
+            return row;
+        }
+
+        function renderSectionBlock(title, subtitle, fields, cfg) {
+            const block = document.createElement('div');
+            block.className = 'border border-slate-700 rounded-lg overflow-hidden';
+            const head = document.createElement('div');
+            head.className = 'px-3 py-2 bg-slate-800';
+            head.innerHTML = `<div class="text-xs font-bold text-purple-300 uppercase tracking-widest">${title}</div><div class="text-[10px] text-slate-400 mt-0.5">${subtitle || ''}</div>`;
+            block.appendChild(head);
+            const body = document.createElement('div');
+            body.className = 'p-3 space-y-2';
+            fields.forEach(f => body.appendChild(createBusinessField(f, cfg)));
+            block.appendChild(body);
+            return block;
+        }
+
+        function renderStrategyParamsSection(cfg) {
+            const block = document.createElement('div');
+            block.className = 'border border-slate-700 rounded-lg overflow-hidden';
+            const head = document.createElement('div');
+            head.className = 'px-3 py-2 bg-slate-800';
+            head.innerHTML = `<div class="text-xs font-bold text-purple-300 uppercase tracking-widest">中书省策略研究中心</div><div class="text-[10px] text-slate-400 mt-0.5">分策略参数面板</div>`;
+            block.appendChild(head);
+            const body = document.createElement('div');
+            body.className = 'p-3 space-y-3';
+            STRATEGY_FORM_GROUPS.forEach(group => {
+                const g = document.createElement('div');
+                g.className = 'border border-slate-700 rounded p-2 space-y-2';
+                const title = document.createElement('div');
+                title.className = 'text-[11px] text-cyan-300 font-bold';
+                title.innerText = group.name;
+                g.appendChild(title);
+                group.fields.forEach(f => g.appendChild(createBusinessField(f, cfg)));
+                body.appendChild(g);
+            });
+            block.appendChild(body);
+            return block;
+        }
+
+        function renderConfigForm(cfg) {
+            const container = document.getElementById('config-form-container');
+            if (!container) return;
+            container.innerHTML = '';
+            BIZ_SECTIONS.forEach(section => {
+                container.appendChild(renderSectionBlock(section.title, section.subtitle, section.fields, cfg));
+            });
+            container.appendChild(renderStrategyParamsSection(cfg));
+        }
+
+        function collectConfigFromForm() {
+            const out = JSON.parse(JSON.stringify(configDraft || {}));
+            document.querySelectorAll('#config-form-container [data-path]').forEach(el => {
+                const path = el.dataset.path;
+                const kind = el.dataset.kind;
+                if (!path || !kind) return;
+                if (kind === 'value') {
+                    const t = el.dataset.valueType;
+                    if (t === 'boolean') {
+                        setByPath(out, path, !!el.checked);
+                    } else if (t === 'number') {
+                        const num = Number(el.value);
+                        setByPath(out, path, Number.isFinite(num) ? num : 0);
+                    } else {
+                        setByPath(out, path, String(el.value || ''));
+                    }
+                } else if (kind === 'lines') {
+                    const itemType = el.dataset.itemType || 'string';
+                    const lines = String(el.value || '').split('\n').map(v => v.trim()).filter(v => v.length > 0);
+                    const arr = lines.map(v => itemType === 'number' ? (Number.isFinite(Number(v)) ? Number(v) : 0) : v);
+                    setByPath(out, path, arr);
+                }
+            });
+            return out;
+        }
+
+        function openConfigCenter() {
+            const modal = document.getElementById('config-modal');
+            if (modal) modal.classList.remove('hidden');
+            loadConfigCenter();
+        }
+
+        function closeConfigCenter() {
+            const modal = document.getElementById('config-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        async function loadConfigCenter() {
+            const status = document.getElementById('config-save-status');
+            try {
+                if (status) status.innerText = '加载中...';
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                if (data.status !== 'success') throw new Error(data.msg || '读取配置失败');
+                configDraft = data.config || {};
+                renderConfigForm(configDraft);
+                if (status) status.innerText = '已加载';
+            } catch (e) {
+                if (status) status.innerText = `读取失败: ${e}`;
+            }
+        }
+
+        async function saveConfigCenter() {
+            const status = document.getElementById('config-save-status');
+            try {
+                if (status) status.innerText = '保存中...';
+                const parsed = collectConfigFromForm();
+                const res = await fetch('/api/config/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ config: parsed })
+                });
+                const data = await res.json();
+                if (data.status !== 'success') throw new Error(data.msg || '保存失败');
+                if (status) status.innerText = '保存成功，已生效';
+                await syncStatus();
+                logMessage('SYSTEM', '配置保存成功并已生效', 'success');
+            } catch (e) {
+                if (status) status.innerText = `保存失败: ${e}`;
+            }
+        }
 
         async function syncStatus() {
             try {
@@ -1407,7 +1816,16 @@
             if (!dates) return;
             const periodText = buildStrategyPeriodText(picked);
             logMessage('回测', `开始回测 ${code} (${dates.start}~${dates.end})，资金 ${capital.toLocaleString()}，策略周期：${periodText}`, 'warning');
-            updateBacktestProgressLog(0, '初始化中...', dates.start);
+            BT_STATE.progress = 0;
+            BT_STATE.totalTrades = 0;
+            BT_STATE.approvedSignals = 0;
+            BT_STATE.rejectedSignals = 0;
+            const txt = document.getElementById('backtest-status-text');
+            const dt = document.getElementById('backtest-date-display');
+            const bar = document.getElementById('backtest-progress-bar');
+            if (txt) txt.innerText = '初始化中...';
+            if (dt) dt.innerText = dates.start;
+            if (bar) bar.style.width = '0%';
             
             ws.send(JSON.stringify({
                 type: 'start_backtest',
@@ -1460,26 +1878,97 @@
         
         function updateBacktestProgress(data) {
             const { progress, current_date } = data;
-            updateBacktestProgressLog(progress, `正在模拟市场数据... ${progress}%`, current_date);
+            const bar = document.getElementById('backtest-progress-bar');
+            const txt = document.getElementById('backtest-status-text');
+            const dt = document.getElementById('backtest-date-display');
+            if (bar) bar.style.width = `${Math.max(0, Math.min(100, Number(progress || 0)))}%`;
+            if (txt) txt.innerText = `回测推进中 ${progress}%`;
+            if (dt) dt.innerText = current_date || '--';
+            const p = Number(progress || 0);
+            if (p >= BT_STATE.progress + 10 || p === 100) {
+                BT_STATE.progress = p;
+                logMessage('回测', `进度 ${p}% · 当前时间 ${current_date || '--'} · 交易 ${BT_STATE.totalTrades}`, 'warning');
+            }
+            if (p > 0 && p < 100) {
+                const heat = Math.min(100, Math.max(0, BT_STATE.approvedSignals - BT_STATE.rejectedSignals + 50));
+                const temp = document.getElementById('rites-market-temp');
+                if (temp) temp.innerText = `🔥 ${Math.round(heat)} (Backtest)`;
+            }
         }
 
-        function updateBacktestProgressLog(progress, statusText, currentDate) {
-            let row = document.getElementById('backtest-progress-row');
-            if (!row) {
-                const timeline = document.getElementById('imperial-timeline');
-                if (!timeline) return;
-                row = document.createElement('div');
-                row.id = 'backtest-progress-row';
-                row.className = 'flex gap-2';
-                timeline.appendChild(row);
+        function pulsePanel(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.add('ring-2', 'ring-purple-400', 'shadow-[0_0_16px_rgba(168,85,247,0.45)]');
+            setTimeout(() => {
+                el.classList.remove('ring-2', 'ring-purple-400', 'shadow-[0_0_16px_rgba(168,85,247,0.45)]');
+            }, 500);
+        }
+
+        function renderBacktestFlow(data) {
+            const module = data.module || '回测';
+            const msg = data.msg || '';
+            const type = data.level || 'system';
+            logMessage(module, msg, type);
+            if (data.module === '太子院') pulsePanel('panel-li');
+            if (data.module === '中书省') pulsePanel('panel-li');
+            if (data.module === '门下省') pulsePanel('panel-xing');
+            if (data.module === '尚书省') pulsePanel('panel-bing');
+            if (data.module === '户部') pulsePanel('panel-hu');
+            if (data.module === '工部') pulsePanel('panel-gong');
+            if (data.module === '吏部') pulsePanel('panel-li');
+            if (data.module === '礼部') pulsePanel('panel-li-rites');
+            if (data.module === '兵部') pulsePanel('panel-bing');
+            DIAG_STATE.signalConsistency = Math.max(20, Math.min(99, 50 + BT_STATE.approvedSignals - BT_STATE.rejectedSignals));
+            updateConfidenceScore();
+        }
+
+        function renderBacktestTrade(data) {
+            const dir = data.dir || '--';
+            const code = data.code || '--';
+            const price = Number(data.price || 0).toFixed(2);
+            const qty = data.qty || 0;
+            const strategy = data.strategy || '--';
+            const actionEl = document.getElementById('war-action');
+            if (actionEl) {
+                actionEl.innerText = dir;
+                actionEl.className = `font-bold ${dir === 'BUY' ? 'text-trading-green' : 'text-trading-red'}`;
             }
-            row.innerHTML = `
-                <span class="text-slate-500">[${getTime()}]</span>
-                <span class="font-bold w-16 text-right text-trading-yellow">回测进度</span>
-                <span class="text-slate-200 flex-1">${statusText} | 当前时间: ${currentDate || '--'}</span>
-            `;
-            const timeline = document.getElementById('imperial-timeline');
-            if (timeline) timeline.scrollTop = timeline.scrollHeight;
+            const warPrice = document.getElementById('war-price');
+            if (warPrice) warPrice.innerText = price;
+            BT_STATE.totalTrades += 1;
+            pulsePanel('panel-bing');
+            logMessage('尚书省', `[${strategy}] ${dir} ${code} @ ${price} x ${qty}`, dir === 'BUY' ? 'success' : 'warning');
+            updateConfidenceScore();
+        }
+
+        function updateMinistryTick(data) {
+            if (data.cash !== undefined) {
+                const cashEl = document.getElementById('revenue-cash');
+                if (cashEl) cashEl.innerText = Number(data.cash).toLocaleString();
+            }
+            if (data.available_pos_pct !== undefined) {
+                const ap = document.getElementById('personnel-available-pos');
+                if (ap) ap.innerText = `${Number(data.available_pos_pct).toFixed(1)}%`;
+            }
+            if (data.main_strategy) {
+                const ms = document.getElementById('personnel-main-strategy');
+                if (ms) ms.innerText = `Strategy-${data.main_strategy}`;
+            }
+            if (data.drawdown_pct !== undefined) {
+                const dd = document.getElementById('justice-dd-current');
+                if (dd) {
+                    dd.innerText = `${Number(data.drawdown_pct).toFixed(2)}%`;
+                    dd.className = Number(data.drawdown_pct) > 2 ? 'font-mono text-trading-red' : 'font-mono text-trading-green';
+                }
+            }
+            if (data.compliance_status) {
+                const c = document.getElementById('rites-compliance-status');
+                if (c) {
+                    c.innerText = data.compliance_status;
+                    c.className = data.compliance_status === 'PASS' ? 'text-trading-green' : 'text-trading-red';
+                }
+            }
         }
 
         function buildStrategyPeriodText(ids) {
@@ -1550,7 +2039,12 @@
         }
         
         function showBacktestResults(data) {
-            updateBacktestProgressLog(100, '回测完成 100%', 'Done');
+            const txt = document.getElementById('backtest-status-text');
+            const dt = document.getElementById('backtest-date-display');
+            const bar = document.getElementById('backtest-progress-bar');
+            if (txt) txt.innerText = '回测完成 100%';
+            if (dt) dt.innerText = 'Done';
+            if (bar) bar.style.width = '100%';
             const selected = selectedStrategyIds.length ? selectedStrategyIds : strategyCatalog.map(s => String(s.id));
             logMessage('回测', `回测完成：${data.stock}，策略周期：${buildStrategyPeriodText(selected)}`, 'success');
             

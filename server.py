@@ -178,6 +178,9 @@ class StrategySwitchRequest(BaseModel):
 class SourceSwitchRequest(BaseModel):
     source: str
 
+class ConfigUpdateRequest(BaseModel):
+    config: dict
+
 # --- Routes ---
 
 @app.get("/")
@@ -211,6 +214,42 @@ async def api_strategies():
     except Exception as e:
         logger.error(f"Failed to load strategies: {e}", exc_info=True)
         return {"status": "error", "strategies": []}
+
+@app.get("/api/config")
+async def api_get_config():
+    try:
+        cfg = ConfigLoader.reload()
+        payload = cfg.to_dict()
+        return {"status": "success", "config": payload}
+    except Exception as e:
+        logger.error(f"/api/config failed: {e}", exc_info=True)
+        return {"status": "error", "msg": str(e), "config": {}}
+
+@app.post("/api/config/save")
+async def api_save_config(req: ConfigUpdateRequest):
+    global config, cabinet_task, current_cabinet, current_provider_source
+    try:
+        if not isinstance(req.config, dict):
+            return {"status": "error", "msg": "config must be object"}
+        cfg = ConfigLoader.reload()
+        cfg._config = req.config
+        cfg.save("config.json")
+        config = ConfigLoader.reload()
+        current_provider_source = config.get("data_provider.source", "default")
+        live_enabled = bool(config.get("system.enable_live", True))
+        restarted = False
+        if current_cabinet and type(current_cabinet).__name__ == "LiveCabinet":
+            stock_code = getattr(current_cabinet, "stock_code", None)
+            if cabinet_task and not cabinet_task.done():
+                cabinet_task.cancel()
+            if live_enabled and stock_code:
+                cabinet_task = asyncio.create_task(run_cabinet_task(stock_code))
+                restarted = True
+        await manager.broadcast({"type": "system", "data": {"msg": "配置已更新并生效"}})
+        return {"status": "success", "msg": "config saved", "live_restarted": restarted, "live_enabled": live_enabled}
+    except Exception as e:
+        logger.error(f"/api/config/save failed: {e}", exc_info=True)
+        return {"status": "error", "msg": str(e)}
 
 @app.get("/api/report/latest")
 async def api_latest_report():

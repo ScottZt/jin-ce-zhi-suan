@@ -65,6 +65,30 @@ class BacktestCabinet:
         if self.event_callback:
             await self.event_callback(event_type, data)
 
+    async def _emit_account_snapshot(self, kline, active_strategy_id=None, compliance_status="PASS"):
+        holdings_value = self.state_affairs.update_holdings_value({kline['code']: kline['close']})
+        fund_value = self.revenue.cash + holdings_value
+        pnl_pct = ((fund_value / self.initial_capital) - 1.0) * 100 if self.initial_capital else 0.0
+        pos_ratio = (holdings_value / fund_value * 100) if fund_value > 0 else 0.0
+        await self._emit('account', {
+            'assets': round(fund_value, 2),
+            'cash': round(self.revenue.cash, 2),
+            'pnl': f"{pnl_pct:+.2f}%",
+            'pos_ratio': f"{pos_ratio:.2f}%"
+        })
+        current_dd = 0.0
+        if self.revenue.daily_nav:
+            nav_series = [x.get('nav', 0.0) for x in self.revenue.daily_nav]
+            peak = max(nav_series) if nav_series else fund_value
+            current_dd = ((peak - fund_value) / peak * 100) if peak > 0 else 0.0
+        await self._emit('ministry_tick', {
+            'cash': round(self.revenue.cash, 2),
+            'available_pos_pct': max(0.0, 100.0 - pos_ratio),
+            'main_strategy': active_strategy_id,
+            'drawdown_pct': round(current_dd, 2),
+            'compliance_status': compliance_status
+        })
+
     async def run(self, start_date=None, end_date=None):
         if not start_date:
             start_date = datetime.now() - timedelta(days=365)
@@ -72,6 +96,8 @@ class BacktestCabinet:
             end_date = datetime.now()
 
         await self._emit('system', {'msg': f"开始回测 {self.stock_code} ({start_date.date()} - {end_date.date()})..."})
+        await self._emit('backtest_flow', {'module': '太子院', 'level': 'system', 'msg': f'校验标的与回测区间: {self.stock_code} {start_date.date()}~{end_date.date()}'})
+        await self._emit('backtest_flow', {'module': '工部', 'level': 'system', 'msg': f'装载行情数据: {self.stock_code} {start_date.date()}~{end_date.date()}...'})
         
         # 1. Fetch Data
         provider_source = self.config.get("data_provider.source", "default")
@@ -110,6 +136,7 @@ class BacktestCabinet:
         df = self.works.clean_data(df)
         total_bars = len(df)
         await self._emit('system', {'msg': f"已获取 {total_bars} 条K线数据，正在初始化策略..."})
+        await self._emit('backtest_flow', {'module': '工部', 'level': 'system', 'msg': f'数据清洗完成，共 {total_bars} 条分钟K线'})
         day_end_dt_set = set(pd.to_datetime(df.groupby(df["dt"].dt.date)["dt"].max()).tolist())
 
         strategy_trigger_tf = {s.id: getattr(s, "trigger_timeframe", "1min") for s in self.strategies}
@@ -134,6 +161,7 @@ class BacktestCabinet:
                 tf_dt_sets[tf] = set(tf_df["dt"].tolist())
         if needed_timeframes:
             await self._emit('system', {'msg': f"策略周期映射已启用: {strategy_trigger_tf}"})
+            await self._emit('backtest_flow', {'module': '中书省', 'level': 'system', 'msg': f'策略周期映射: {strategy_trigger_tf}'})
 
         # 2. Warm up strategies with initial data (optional, or just run)
         # Here we just run bar by bar
@@ -146,12 +174,13 @@ class BacktestCabinet:
             # For now, just yield control
             if i % 100 == 0:
                 await asyncio.sleep(0) # Yield
+            kline = row
             
             if i % report_interval == 0:
                 progress = int((i / total_bars) * 100)
                 await self._emit('backtest_progress', {'progress': progress, 'current_date': str(row['dt'])})
-
-            kline = row
+                await self._emit('market', {'price': float(kline['close']), 'ma5': float(kline['close']) * 0.99, 'macd': 0.0, 'rsi': 50.0, 'time': str(row['dt'])})
+                await self._emit_account_snapshot(kline, active_strategy_id=None, compliance_status="PASS")
             
             current_dt = pd.to_datetime(kline["dt"])
             runnable_strategy_ids = []
@@ -167,9 +196,20 @@ class BacktestCabinet:
 
             # Generate Signals
             signals = self.secretariat.generate_signals(kline, runnable_strategy_ids=runnable_strategy_ids)
+            if signals:
+                await self._emit('backtest_flow', {
+                    'module': '中书省',
+                    'level': 'warning',
+                    'msg': f"{current_dt} 触发 {len(signals)} 条候选交易信号（策略: {','.join([s['strategy_id'] for s in signals])}）"
+                })
             
             for signal in signals:
                 sid = signal['strategy_id']
+                await self._emit('zhongshu', {
+                    'msg': f"策略 {sid} 生成信号",
+                    'details': f"> 标的: {signal['code']}<br>> 方向: {signal['direction']}<br>> 价格: {float(signal['price']):.2f}",
+                    'status': 'bg-trading-blue'
+                })
                 
                 # Check Risk
                 # Approx fund value for backtest speed
@@ -177,12 +217,35 @@ class BacktestCabinet:
                 current_positions = self.state_affairs.positions.get(sid, {})
                 
                 approved, reason = self.chancellery.check_signal(signal, current_fund_value, current_positions, 0.0)
+                await self._emit('menxia', {
+                    'msg': "风控审核通过" if approved else "风控审核拒绝",
+                    'details': f"> 策略: {sid}<br>> 结果: {'通过' if approved else '拒绝'}<br>> 原因: {reason}",
+                    'status': 'bg-trading-green' if approved else 'bg-trading-red',
+                    'decision': 'approved' if approved else 'rejected',
+                    'strategy_id': sid,
+                    'reason': reason
+                })
+                await self._emit('backtest_flow', {
+                    'module': '门下省',
+                    'level': 'success' if approved else 'danger',
+                    'msg': f"策略 {sid} 风控{'通过' if approved else '拒绝'}：{reason}"
+                })
                 
                 if approved:
+                    await self._emit('shangshu', {
+                        'msg': "准备执行交易指令",
+                        'details': f"> 策略: {sid}<br>> 动作: {signal['direction']}<br>> 数量: {signal['qty']}",
+                        'status': 'bg-trading-yellow'
+                    })
                     executed = self.state_affairs.execute_order(sid, signal, kline)
                     if executed:
                         new_qty = self.state_affairs.positions[sid][signal['code']]['qty'] if signal['code'] in self.state_affairs.positions.get(sid, {}) else 0
                         self.secretariat.update_strategy_state(sid, signal['code'], new_qty)
+                        await self._emit('backtest_flow', {
+                            'module': '尚书省',
+                            'level': 'success',
+                            'msg': f"执行成交: 策略 {sid} {signal['direction']} {signal['code']} @ {float(signal['price']):.2f} x {signal['qty']}"
+                        })
                         
                         # Emit trade log occasionally or accumulate?
                         # Sending every trade might flood WS if high freq.
@@ -195,12 +258,18 @@ class BacktestCabinet:
                             'price': signal['price'],
                             'qty': signal['qty']
                         })
+                        await self._emit_account_snapshot(kline, active_strategy_id=sid, compliance_status="PASS")
 
             # Check Stops
             triggered_orders = self.state_affairs.check_stops(kline)
             for order in triggered_orders:
                 self.state_affairs.execute_order(order['strategy_id'], order, kline)
                 self.secretariat.update_strategy_state(order['strategy_id'], order['code'], 0)
+                await self._emit('backtest_flow', {
+                            'module': '兵部',
+                            'level': 'warning',
+                            'msg': f"触发止损/止盈: 策略 {order['strategy_id']} {order['code']} {order['direction']} x {order['qty']}"
+                        })
                 await self._emit('backtest_trade', {
                             'dt': str(kline['dt']),
                             'strategy': order['strategy_id'],
@@ -210,6 +279,7 @@ class BacktestCabinet:
                             'qty': order['qty'],
                             'reason': 'STOP'
                         })
+                await self._emit_account_snapshot(kline, active_strategy_id=order['strategy_id'], compliance_status="PASS")
 
         # 4. Generate Report
         await self._emit('backtest_progress', {'progress': 100, 'current_date': 'Done'})
@@ -239,5 +309,6 @@ class BacktestCabinet:
             'ranking': ranking_dict,
             'total_trades': sum(r['total_trades'] for r in reports)
         })
+        await self._emit('backtest_flow', {'module': '礼部', 'level': 'success', 'msg': f'回测结算完成，总交易 {sum(r["total_trades"] for r in reports)} 笔'})
         
         await self._emit('system', {'msg': f"回测完成。"})

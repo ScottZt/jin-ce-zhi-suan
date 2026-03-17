@@ -1,6 +1,7 @@
 # src/ministries/bing_bu_war.py
 
 from src.utils.constants import *
+from src.utils.runtime_params import get_value
 
 class BingBuWar:
     """
@@ -22,12 +23,13 @@ class BingBuWar:
         
         direction = order['direction'] # 'BUY' or 'SELL'
         price = kline['open']
+        slippage = float(get_value("execution.slippage", SLIPPAGE))
         
         # Apply slippage
         if direction == 'BUY':
-            fill_price = price * (1 + SLIPPAGE)
+            fill_price = price * (1 + slippage)
         else:
-            fill_price = price * (1 - SLIPPAGE)
+            fill_price = price * (1 - slippage)
             
         # Check if price is within K-line range (it is, since we use Open)
         # But if it's a stop loss/take profit trigger, we check against High/Low.

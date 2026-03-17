@@ -1,6 +1,7 @@
 # src/ministries/hu_bu_revenue.py
 import pandas as pd
 from src.utils.constants import *
+from src.utils.runtime_params import get_value
 
 class HuBuRevenue:
     """
@@ -21,15 +22,19 @@ class HuBuRevenue:
         Returns: (total_cost, commission, stamp_duty, transfer_fee)
         """
         # Commission: Max(5, amount * 0.00025)
-        commission = max(MIN_COMMISSION, amount * COMMISSION_RATE)
+        min_commission = float(get_value("trading_cost.min_commission", MIN_COMMISSION))
+        commission_rate = float(get_value("trading_cost.commission_rate", COMMISSION_RATE))
+        stamp_duty_rate = float(get_value("trading_cost.stamp_duty", STAMP_DUTY))
+        transfer_fee_rate = float(get_value("trading_cost.transfer_fee", TRANSFER_FEE))
+        commission = max(min_commission, amount * commission_rate)
         
         # Stamp Duty: 0.1% on SELL only
         stamp_duty = 0.0
         if direction == 'SELL':
-            stamp_duty = amount * STAMP_DUTY
+            stamp_duty = amount * stamp_duty_rate
             
         # Transfer Fee: amount * 0.00001
-        transfer_fee = amount * TRANSFER_FEE
+        transfer_fee = amount * transfer_fee_rate
         
         total_cost = commission + stamp_duty + transfer_fee
         return total_cost, commission, stamp_duty, transfer_fee

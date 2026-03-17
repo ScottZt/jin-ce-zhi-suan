@@ -66,3 +66,14 @@ class ConfigLoader:
         for k in keys[:-1]:
             current = current.setdefault(k, {})
         current[keys[-1]] = value
+
+    def to_dict(self):
+        return json.loads(json.dumps(self._config, ensure_ascii=False))
+
+    def save(self, config_path="config.json"):
+        if not os.path.exists(config_path):
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(os.path.dirname(base_dir))
+            config_path = os.path.join(project_root, "config.json")
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(self._config, f, ensure_ascii=False, indent=2)

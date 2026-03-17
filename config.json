@@ -1,34 +1,86 @@
 {
   "system": {
-    "mode": "backtest",  // 运行模式: "live" (实盘监控) 或 "backtest" (历史回测)
-    "enable_live": false, // Live功能总开关: true开启, false关闭
-    "initial_capital": 1000000.0, // 初始资金 (元)
-    "log_level": "INFO" // 日志级别: DEBUG, INFO, WARNING, ERROR
+    "mode": "backtest",
+    "enable_live": false,
+    "initial_capital": 1000000.0,
+    "log_level": "INFO"
   },
   "data_provider": {
-    "source": "default", // 数据源选择: "akshare" (免费/默认), "tushare" (需Token), "default" (自定义API)
+    "source": "default",
     "enable_fallback": true,
-    
-    // Tushare 配置 (仅当 source="tushare" 时生效)
     "tushare_token": "4ba065ecb8eebdebc93dffaef6bc051eeb3a98b46eb7d94fd697282f",
-    
-    // 自定义 API 配置 (仅当 source="default" 时生效)
-    // 示例: 您的 Quantify API 服务地址
     "default_api_key": "abc123",
     "default_api_url": "https://tactics-ireland-ash-nato.trycloudflare.com"
   },
   "targets": [
-    "301227.SZ" // 森鹰窗业
+    "301227.SZ"
   ],
   "strategies": {
-    // 激活的策略编号列表
-    // 01: 三周期共振, 02: 烂板战法, 03: ETF轮动, 04: 首阴反包, 05: 3N主升浪, 06: 海豚交易法, 07: 跳空交易系统
-    "active_ids": ["01", "02", "03", "04", "05", "06", "07"]
+    "active_ids": [
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07"
+    ]
   },
   "risk_control": {
-    "max_stop_loss_pct": 0.05,    // 单笔最大止损幅度 (5%)
-    "max_pos_per_stock": 0.10,    // 单票最大仓位 (10%)
-    "max_total_pos": 0.50,        // 总仓位上限 (50%)
-    "max_daily_loss_pct": 0.02    // 单日最大亏损熔断线 (2%)
+    "max_stop_loss_pct": 0.05,
+    "max_pos_per_stock": 0.1,
+    "max_total_pos": 0.5,
+    "max_daily_loss_pct": 0.02
+  },
+  "trading_cost": {
+    "commission_rate": 0.00025,
+    "min_commission": 5.0,
+    "stamp_duty": 0.001,
+    "transfer_fee": 1e-05
+  },
+  "execution": {
+    "slippage": 0.001
+  },
+  "strategy_params": {
+    "common": {
+      "order_qty": 1000
+    },
+    "01": {
+      "min_history_bars": 500,
+      "daily_ma10_tolerance": 0.02,
+      "volume_ma_window": 5,
+      "stop_loss_pct": 0.03
+    },
+    "02": {
+      "max_hold_bars": 240
+    },
+    "03": {
+      "stop_loss_pct": 0.05
+    },
+    "05": {
+      "min_30m_bars": 20,
+      "volume_ma_window": 5,
+      "volume_multiple": 1.5,
+      "max_hold_bars": 1200,
+      "stop_loss_pct": 0.05,
+      "take_profit_pct": 0.1
+    },
+    "06": {
+      "min_history_bars": 50,
+      "ma_period": 26,
+      "trailing_stop_pct": 0.01,
+      "stop_loss_pct": 0.01
+    },
+    "07": {
+      "min_15m_bars": 20,
+      "gap_down_multiplier": 0.998,
+      "trailing_stop_pct": 0.01,
+      "stop_loss_pct": 0.01
+    },
+    "08": {
+      "min_history_bars": 13,
+      "trailing_stop_pct": 0.01,
+      "stop_loss_pct": 0.01
+    }
   }
 }
