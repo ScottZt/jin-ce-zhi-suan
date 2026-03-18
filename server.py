@@ -71,10 +71,6 @@ current_backtest_progress = {"progress": 0, "current_date": None}
 report_history = []
 REPORTS_DIR = os.path.join("data", "reports")
 REPORTS_FILE = os.path.join(REPORTS_DIR, "backtest_reports.json")
-BT_FLOW_EMIT_EVERY = 3
-BT_DETAIL_EMIT_EVERY = 3
-_bt_flow_emit_seq = 0
-_bt_detail_emit_seq = 0
 
 # Config
 config = ConfigLoader()
@@ -129,7 +125,7 @@ def _sanitize_non_finite(obj):
     return obj
 
 def start_new_backtest_report(stock_code, strategy_id, request_payload=None):
-    global current_backtest_report, latest_backtest_result, latest_strategy_reports, current_backtest_progress, _bt_flow_emit_seq, _bt_detail_emit_seq
+    global current_backtest_report, latest_backtest_result, latest_strategy_reports, current_backtest_progress
     report_id = f"{int(datetime.now().timestamp() * 1000)}-{os.urandom(2).hex()}"
     current_backtest_report = {
         "report_id": report_id,
@@ -146,8 +142,6 @@ def start_new_backtest_report(stock_code, strategy_id, request_payload=None):
     latest_backtest_result = None
     latest_strategy_reports = {}
     current_backtest_progress = {"progress": 0, "current_date": None}
-    _bt_flow_emit_seq = 0
-    _bt_detail_emit_seq = 0
     return report_id
 
 def finalize_current_backtest_report():
@@ -716,25 +710,53 @@ async def api_get_status():
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
+        self.connection_queues = {}
+        self.sender_tasks = {}
+        self.queue_maxsize = 20000
+        self.send_timeout_sec = 5.0
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        q = asyncio.Queue(maxsize=self.queue_maxsize)
+        self.connection_queues[websocket] = q
+        self.sender_tasks[websocket] = asyncio.create_task(self._sender_loop(websocket, q))
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+        task = self.sender_tasks.pop(websocket, None)
+        if task is not None:
+            task.cancel()
+        self.connection_queues.pop(websocket, None)
+
+    async def _sender_loop(self, websocket: WebSocket, q: asyncio.Queue):
+        try:
+            while True:
+                payload = await q.get()
+                try:
+                    await asyncio.wait_for(websocket.send_json(payload), timeout=self.send_timeout_sec)
+                except Exception as e:
+                    print(f"WS Error: {e}")
+                    break
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self.disconnect(websocket)
 
     async def broadcast(self, message: dict):
-        stale_connections = []
         for connection in list(self.active_connections):
+            q = self.connection_queues.get(connection)
+            if q is None:
+                continue
             try:
-                await asyncio.wait_for(connection.send_json(message), timeout=2.0)
-            except Exception as e:
-                print(f"WS Error: {e}")
-                stale_connections.append(connection)
-        for connection in stale_connections:
-            self.disconnect(connection)
+                q.put_nowait(message)
+            except asyncio.QueueFull:
+                try:
+                    _ = q.get_nowait()
+                    q.put_nowait(message)
+                except Exception:
+                    self.disconnect(connection)
 
 manager = ConnectionManager()
 
@@ -906,7 +928,7 @@ async def run_backtest_task(stock_code, strategy_id, strategy_mode=None, start=N
         fail_current_backtest_report(str(e))
 
 async def emit_event_to_ws(event_type, data):
-    global latest_backtest_result, latest_strategy_reports, current_backtest_report, current_backtest_progress, _bt_flow_emit_seq, _bt_detail_emit_seq
+    global latest_backtest_result, latest_strategy_reports, current_backtest_report, current_backtest_progress
     if event_type == "backtest_result":
         latest_backtest_result = data
         if current_backtest_report is not None:
@@ -929,20 +951,6 @@ async def emit_event_to_ws(event_type, data):
             latest_strategy_reports[sid] = data
             if current_backtest_report is not None:
                 current_backtest_report["strategy_reports"][sid] = data
-    is_backtest_running = bool(current_backtest_report and str(current_backtest_report.get("status", "")).lower() == "running")
-    if is_backtest_running:
-        if event_type == "backtest_flow":
-            _bt_flow_emit_seq += 1
-            level = str(data.get("level", "")).lower() if isinstance(data, dict) else ""
-            module = str(data.get("module", "")) if isinstance(data, dict) else ""
-            keep = level in {"danger", "error"} or module in {"礼部"}
-            if not keep and (_bt_flow_emit_seq % BT_FLOW_EMIT_EVERY) != 1:
-                return
-        elif event_type in {"zhongshu", "menxia", "shangshu"}:
-            _bt_detail_emit_seq += 1
-            keep = bool(isinstance(data, dict) and data.get("decision") == "rejected")
-            if not keep and (_bt_detail_emit_seq % BT_DETAIL_EMIT_EVERY) != 1:
-                return
     # print(f"Emit: {event_type}")
     payload = {
         "type": event_type,
@@ -978,5 +986,6 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         ws_ping_interval=20.0,
-        ws_ping_timeout=120.0
+        ws_ping_timeout=180.0,
+        ws_max_queue=1024
     )

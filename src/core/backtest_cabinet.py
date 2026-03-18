@@ -198,6 +198,14 @@ class BacktestCabinet:
             if i % 10 == 0:
                 await asyncio.sleep(0) # Yield
             kline = row
+            if "volume" not in kline and "vol" in kline:
+                kline["volume"] = kline["vol"]
+            if "vol" not in kline and "volume" in kline:
+                kline["vol"] = kline["volume"]
+            if "turnover" not in kline and "amount" in kline:
+                kline["turnover"] = kline["amount"]
+            if "amount" not in kline and "turnover" in kline:
+                kline["amount"] = kline["turnover"]
             
             if i % report_interval == 0:
                 progress = int((i / total_bars) * 100)

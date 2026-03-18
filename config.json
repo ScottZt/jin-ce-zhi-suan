@@ -11,9 +11,9 @@
     "tushare_token": "4ba065ecb8eebdebc93dffaef6bc051eeb3a98b46eb7d94fd697282f",
     "default_api_key": "abc123",
     "default_api_url": "https://tactics-ireland-ash-nato.trycloudflare.com",
-    "llm_api_url": "https://integrate.api.nvidia.com/v1",
-    "llm_api_key": "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",
-    "llm_model": "minimaxai/minimax-m2.1"
+    "llm_api_url": "http://newapi.200m.997555.xyz",
+    "llm_api_key": "sk-iYutsmarHYAYNFieaEZ38VIikvU4q0KuEeGspoNR6f85IcOj",
+    "llm_model": "claude-opus-4-6"
   },
   "targets": [
     "301227.SZ"
@@ -32,16 +32,16 @@
     ]
   },
   "risk_control": {
-    "max_stop_loss_pct": 0.05,
+    "max_stop_loss_pct": 0.1,
     "max_pos_per_stock": 1,
     "max_total_pos": 1,
     "max_daily_loss_pct": 0.05
   },
   "trading_cost": {
-    "commission_rate": 2e-05,
-    "min_commission": 1,
-    "stamp_duty": 0.001,
-    "transfer_fee": 1e-05
+    "commission_rate": 0.0002,
+    "min_commission": 23,
+    "stamp_duty": 0,
+    "transfer_fee": 0
   },
   "execution": {
     "slippage": 0.001

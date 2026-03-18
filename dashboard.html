@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>金策智算 AI 交易决策控制台</title>
+    <title>金策智算 智能交易决策控制台</title>
     
     <!-- Tailwind CSS v3 -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -198,24 +198,24 @@
         <div id="backtest-results" class="hidden p-6 rounded-lg relative">
             <button onclick="closeBacktest()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-times text-xl"></i></button>
             <a href="/report" target="_blank" class="absolute top-4 right-14 text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded">回测报告页</a>
-            <h2 class="text-2xl font-bold text-white mb-1 border-b border-slate-700 pb-2"><i class="fa-solid fa-chart-line text-trading-blue mr-2"></i>回测报告 (Backtest Report)</h2>
-            <div class="text-xs text-slate-400 mb-4 font-mono">CODE: <span id="bt-code" class="text-white">--</span> | PERIOD: <span id="bt-period" class="text-white">--</span></div>
+            <h2 class="text-2xl font-bold text-white mb-1 border-b border-slate-700 pb-2"><i class="fa-solid fa-chart-line text-trading-blue mr-2"></i>回测绩效报告</h2>
+            <div class="text-xs text-slate-400 mb-4 font-mono">标的代码: <span id="bt-code" class="text-white">--</span> | 回测区间: <span id="bt-period" class="text-white">--</span></div>
             
             <div class="grid grid-cols-4 gap-4 mb-6">
                 <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
-                    <div class="text-xs text-slate-400">最佳策略 (Best)</div>
+                    <div class="text-xs text-slate-400">最佳策略</div>
                     <div class="text-lg font-bold text-trading-green font-mono" id="bt-best-strat">--</div>
                 </div>
                 <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
-                    <div class="text-xs text-slate-400">总交易数 (Trades)</div>
+                    <div class="text-xs text-slate-400">总交易数</div>
                     <div class="text-lg font-bold text-white font-mono" id="bt-trades">--</div>
                 </div>
                 <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
-                    <div class="text-xs text-slate-400">卡玛比率 (Calmar)</div>
+                    <div class="text-xs text-slate-400">卡玛比率</div>
                     <div class="text-lg font-bold text-trading-blue font-mono" id="bt-calmar">--</div>
                 </div>
                 <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
-                    <div class="text-xs text-slate-400">年化收益 (Annual)</div>
+                    <div class="text-xs text-slate-400">年化收益</div>
                     <div class="text-lg font-bold text-trading-yellow font-mono" id="bt-roi">--</div>
                 </div>
             </div>
@@ -224,14 +224,14 @@
                 <table class="w-full text-left text-xs font-mono">
                     <thead class="text-slate-400 bg-slate-800 uppercase">
                         <tr>
-                            <th class="px-3 py-2">Rank</th>
-                            <th class="px-3 py-2">Strategy</th>
+                            <th class="px-3 py-2">排名</th>
+                            <th class="px-3 py-2">策略</th>
                             <th class="px-3 py-2">周期</th>
-                            <th class="px-3 py-2">Rating</th>
-                            <th class="px-3 py-2">ROI (Ann)</th>
-                            <th class="px-3 py-2">Max DD</th>
-                            <th class="px-3 py-2">Win Rate</th>
-                            <th class="px-3 py-2">Calmar</th>
+                            <th class="px-3 py-2">评级</th>
+                            <th class="px-3 py-2">年化收益</th>
+                            <th class="px-3 py-2">最大回撤</th>
+                            <th class="px-3 py-2">胜率</th>
+                            <th class="px-3 py-2">卡玛比率</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-700 text-slate-300" id="bt-ranking-body">
@@ -279,31 +279,31 @@
         <div class="flex items-center gap-4">
             <div class="text-2xl text-trading-blue animate-pulse"><i class="fa-solid fa-dragon"></i></div>
             <div>
-                <h1 class="font-bold text-lg tracking-wide text-white">金策智算 <span class="text-trading-blue text-xs font-mono bg-blue-900/30 px-2 py-0.5 rounded">AI SYSTEM</span></h1>
-                <div class="text-[10px] text-trading-dim font-mono tracking-wider">JINCE INTELLIGENT TRADING SYSTEM</div>
+                <h1 class="font-bold text-lg tracking-wide text-white">金策智算 <span class="text-trading-blue text-xs font-mono bg-blue-900/30 px-2 py-0.5 rounded">智能投研决策系统</span></h1>
+                <div class="text-[10px] text-trading-dim font-mono tracking-wider">量化投资 · 智能执行 · 风控协同</div>
             </div>
         </div>
 
         <!-- Account Status -->
         <div class="flex items-center gap-8 bg-slate-800/50 px-6 py-2 rounded-lg border border-slate-700/50">
             <div class="text-center">
-                <div class="text-[10px] text-trading-dim uppercase">总资产 (Assets)</div>
+                <div class="text-[10px] text-trading-dim uppercase">总资产</div>
                 <div class="font-mono font-bold text-lg text-white" id="total-assets">¥ 1,000,000</div>
             </div>
             <div class="h-8 w-px bg-slate-700"></div>
             <div class="text-center">
-                <div class="text-[10px] text-trading-dim uppercase">日盈亏 (P&L)</div>
+                <div class="text-[10px] text-trading-dim uppercase">日盈亏</div>
                 <div class="font-mono font-bold text-lg text-trading-red" id="daily-pnl">+0.00%</div>
             </div>
             <div class="h-8 w-px bg-slate-700"></div>
             <div class="text-center">
-                <div class="text-[10px] text-trading-dim uppercase">仓位 (Pos)</div>
+                <div class="text-[10px] text-trading-dim uppercase">仓位</div>
                 <div class="font-mono font-bold text-lg text-trading-blue" id="position-ratio">0%</div>
             </div>
             <div class="h-8 w-px bg-slate-700"></div>
             <div class="text-center">
-                <div class="text-[10px] text-trading-dim uppercase">风控 (Risk)</div>
-                <div class="font-mono font-bold text-lg text-trading-green" id="risk-level">SAFE</div>
+                <div class="text-[10px] text-trading-dim uppercase">风控</div>
+                <div class="font-mono font-bold text-lg text-trading-green" id="risk-level">稳健</div>
             </div>
         </div>
 
@@ -420,14 +420,14 @@
                 <div id="panel-li" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-purple-500">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2 text-purple-400 font-bold"><i class="fa-solid fa-users-gear"></i> 吏部 - 资金部</div>
-                        <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Active</div>
+                        <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">运行中</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">仓位管理 & 策略分配</div>
                     <div class="text-[10px] text-slate-500 mt-1">参数: 初始资金 <span id="cfg-li-capital" class="text-slate-300">--</span></div>
                     <div class="mt-2 grid grid-cols-2 gap-2">
                         <div class="bg-slate-900/80 p-2 rounded">
                             <div class="text-[10px] text-slate-400">主力策略</div>
-                            <div class="font-mono text-white" id="personnel-main-strategy">Strategy-05</div>
+                            <div class="font-mono text-white" id="personnel-main-strategy">--</div>
                         </div>
                         <div class="bg-slate-900/80 p-2 rounded">
                             <div class="text-[10px] text-slate-400">可用仓位</div>
@@ -440,13 +440,13 @@
                 <div id="panel-hu" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-yellow-500">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2 text-trading-yellow font-bold"><i class="fa-solid fa-coins"></i> 户部 - 交易部</div>
-                        <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Audit</div>
+                        <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">稽核</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">资金核算 & 盈亏统计</div>
                     <div class="text-[10px] text-slate-500 mt-1">参数: 手续费率 <span id="cfg-hu-commission" class="text-slate-300">--</span>，最低费 <span id="cfg-hu-minc" class="text-slate-300">--</span></div>
                     <div class="mt-2 flex items-baseline gap-2">
                         <span class="text-2xl font-mono font-bold text-white" id="revenue-cash">452,000</span>
-                        <span class="text-xs text-slate-400">可用现金 (Cash)</span>
+                        <span class="text-xs text-slate-400">可用资金</span>
                     </div>
                     <div class="w-full bg-slate-700 h-1 rounded-full mt-2 overflow-hidden">
                         <div class="bg-trading-yellow h-full" style="width: 60%"></div>
@@ -457,13 +457,13 @@
                 <div id="panel-li-rites" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-blue-400">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2 text-blue-400 font-bold"><i class="fa-solid fa-book-journal-whills"></i> 礼部 - 合规部</div>
-                        <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Monitor</div>
+                        <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">监测</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">市场情绪 & 交易合规</div>
-                    <div class="text-[10px] text-slate-500 mt-1">参数: Live开关 <span id="cfg-li-rites-live" class="text-slate-300">--</span></div>
+                    <div class="text-[10px] text-slate-500 mt-1">参数: 实盘开关 <span id="cfg-li-rites-live" class="text-slate-300">--</span></div>
                     <div class="mt-2 font-mono text-sm">
-                        <div>市场温度: <span class="text-trading-red" id="rites-market-temp">🔥 78 (Hot)</span></div>
-                        <div>合规检查: <span class="text-trading-green" id="rites-compliance-status">PASS</span></div>
+                        <div>市场温度: <span class="text-trading-red" id="rites-market-temp">🔥 78（偏热）</span></div>
+                        <div>合规检查: <span class="text-trading-green" id="rites-compliance-status">通过</span></div>
                     </div>
                 </div>
 
@@ -472,18 +472,22 @@
                     <div class="absolute -right-4 -bottom-4 text-red-900/20 text-8xl"><i class="fa-solid fa-crosshairs"></i></div>
                     <div class="flex justify-between items-center relative z-10">
                         <div class="flex items-center gap-2 text-red-500 font-bold"><i class="fa-solid fa-person-rifle"></i> 兵部 - 操盘部</div>
-                        <div class="text-[10px] bg-red-900/50 text-red-300 px-1 rounded animate-pulse">SIGNAL</div>
+                        <div class="text-[10px] bg-red-900/50 text-red-300 px-1 rounded animate-pulse">交易信号</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1 relative z-10">买卖信号执行</div>
                     <div class="text-[10px] text-slate-500 mt-1 relative z-10">参数: 滑点 <span id="cfg-bing-slippage" class="text-slate-300">--</span></div>
                     <div class="mt-2 relative z-10 bg-slate-900/80 p-2 rounded border border-red-900/30">
                         <div class="flex justify-between text-xs">
-                            <span class="text-slate-400">Action</span>
-                            <span class="font-bold text-trading-green" id="war-action">BUY</span>
+                            <span class="text-slate-400">交易方向</span>
+                            <span class="font-bold text-trading-green" id="war-action">买入</span>
                         </div>
                         <div class="flex justify-between text-xs mt-1">
-                            <span class="text-slate-400">Price</span>
+                            <span class="text-slate-400">成交价格</span>
                             <span class="font-mono text-white" id="war-price">--</span>
+                        </div>
+                        <div class="flex justify-between text-xs mt-1">
+                            <span class="text-slate-400">成交时间</span>
+                            <span class="font-mono text-white" id="war-time">--</span>
                         </div>
                     </div>
                 </div>
@@ -492,7 +496,7 @@
                 <div id="panel-xing" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-orange-600">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2 text-orange-500 font-bold"><i class="fa-solid fa-gavel"></i> 刑部 - 风控部</div>
-                        <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Guard</div>
+                        <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">风控</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">风控强平 & 违规惩戒</div>
                     <div class="text-[10px] text-slate-500 mt-1">参数: 总仓上限 <span id="cfg-xing-totalpos" class="text-slate-300">--</span></div>
@@ -512,7 +516,7 @@
                 <div id="panel-gong" class="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-between hover:bg-slate-800/50 transition-colors border-l-2 border-l-cyan-500">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-2 text-cyan-400 font-bold"><i class="fa-solid fa-industry"></i> 工部 - 数据部 / 运维部</div>
-                        <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">Sync</div>
+                        <div class="text-[10px] bg-slate-700 px-1 rounded text-slate-300">协同</div>
                     </div>
                     <div class="text-[10px] text-slate-500 mt-1">数据清洗 & 指标计算</div>
                     <div class="text-[10px] text-slate-500 mt-1">参数: 数据源 <span id="cfg-gong-source" class="text-slate-300">--</span>，回退 <span id="cfg-gong-fallback" class="text-slate-300">--</span></div>
@@ -549,23 +553,23 @@
 
             <div id="live-console-panel" class="hidden glass-panel rounded-lg p-3 border border-slate-700/70">
                 <div class="flex items-center justify-between mb-2">
-                    <div class="text-xs uppercase tracking-widest text-slate-400">Live 控制台</div>
+                    <div class="text-xs uppercase tracking-widest text-slate-400">实盘控制台</div>
                     <span id="live-run-state" class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-200">待机</span>
                 </div>
-                <div class="text-[11px] text-slate-300 mb-1">本tick触发周期</div>
+                <div class="text-[11px] text-slate-300 mb-1">本周期触发周期</div>
                 <div id="live-trigger-summary" class="font-mono text-[11px] text-cyan-300 bg-slate-900/60 border border-slate-700 rounded p-2 mb-2">--</div>
-                <div class="text-[11px] text-slate-300 mb-1">本tick策略列表</div>
+                <div class="text-[11px] text-slate-300 mb-1">本周期策略列表</div>
                 <div id="live-strategy-summary" class="font-mono text-[11px] text-emerald-300 bg-slate-900/60 border border-slate-700 rounded p-2">--</div>
                 <div class="text-[10px] text-slate-500 mt-2">周期对照：1min=1分钟，5min=5分钟，10min=10分钟，15min=15分钟，30min=30分钟，60min=60分钟，D=日线</div>
             </div>
             
             <div id="live-stream-panel" class="glass-panel flex-1 rounded-lg p-0 overflow-hidden flex flex-col">
-                <div class="p-2 bg-slate-800/50 text-[10px] text-center text-slate-400 border-b border-slate-700">实时指令流 (Live Stream)</div>
+                <div class="p-2 bg-slate-800/50 text-[10px] text-center text-slate-400 border-b border-slate-700">实时指令流</div>
                 <div class="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs" id="imperial-timeline">
                     <!-- Logs will be injected here -->
                     <div class="flex gap-2 opacity-50">
                         <span class="text-slate-500">[09:30:00]</span>
-                        <span class="text-blue-400">SYSTEM</span>
+                        <span class="text-blue-400">系统</span>
                         <span class="text-slate-300">系统启动...</span>
                     </div>
                 </div>
@@ -611,32 +615,25 @@
             <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded border border-slate-600">
                 <span class="text-slate-400 text-xs"><i class="fa-solid fa-database"></i></span>
                 <select id="source-select" onchange="onSourceSelectChange(this.value)" class="bg-transparent text-white focus:outline-none text-xs font-medium">
-                    <option value="default">default</option>
-                    <option value="tushare">tushare</option>
-                    <option value="akshare">akshare</option>
+                    <option value="default">默认数据源</option>
+                    <option value="tushare">Tushare</option>
+                    <option value="akshare">AKShare</option>
                 </select>
             </div>
         </div>
 
         <!-- Global Status Bar -->
-        <div class="w-[470px] ml-6 mr-3 flex items-center gap-3">
-            <div class="w-[210px]">
+        <div class="w-[300px] ml-6 mr-3 flex items-center gap-3">
+            <div class="w-full">
                 <div class="flex justify-between text-[10px] text-slate-400 mb-1">
-                    <span>AI 决策置信度</span>
+                    <span>智能决策置信度</span>
                     <span class="text-trading-green" id="confidence-val">98.5%</span>
                 </div>
                 <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                     <div class="bg-gradient-to-r from-blue-500 to-green-500 h-full w-[98.5%] animate-pulse" id="confidence-bar"></div>
                 </div>
                 <div id="confidence-desc" class="text-[10px] text-slate-500 mt-1 truncate">一致性 50% · 放行率 50% · 胜率 50%</div>
-            </div>
-            <div class="flex-1 px-1 py-0.5">
-                <svg id="confidence-sparkline" viewBox="0 0 210 48" class="w-full h-11 rounded bg-slate-800/40">
-                    <polyline id="confidence-line-consistency" fill="none" stroke="#60a5fa" stroke-width="1.8" points=""></polyline>
-                    <polyline id="confidence-line-passrate" fill="none" stroke="#34d399" stroke-width="1.8" points=""></polyline>
-                    <polyline id="confidence-line-winrate" fill="none" stroke="#f59e0b" stroke-width="1.8" points=""></polyline>
-                </svg>
-                <div class="flex items-center justify-between text-[9px] mt-0.5">
+                <div class="flex items-center justify-between text-[9px] mt-0.5 bg-slate-800/30 rounded px-2 py-1">
                     <span id="confidence-consistency-val" class="text-blue-300">一致性 --</span>
                     <span id="confidence-passrate-val" class="text-emerald-300">放行率 --</span>
                     <span id="confidence-winrate-val" class="text-amber-300">胜率 --</span>
@@ -648,7 +645,7 @@
             <div id="live-status-wrap" class="hidden text-xs text-slate-500 font-mono">系统状态：<span id="system-status-text" class="text-slate-300">待机</span></div>
             <button id="live-toggle-btn" onclick="toggleLive()" class="hidden bg-trading-green hover:bg-emerald-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-emerald-500 hover:-translate-y-0.5 active:scale-95 min-w-[128px]">
                 <i id="live-toggle-icon" class="fa-solid fa-satellite-dish"></i>
-                <span id="live-toggle-label">启动 Live</span>
+                <span id="live-toggle-label">启动实盘</span>
             </button>
             <button id="backtest-trigger-btn" onclick="startBacktest()" class="bg-trading-blue hover:bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm transition-all shadow-[0_0_10px_rgba(59,130,246,0.3)] border border-blue-500 min-w-[128px]">
                 <i id="backtest-trigger-icon" class="fa-solid fa-play"></i>
@@ -723,10 +720,10 @@
             <div class="px-4 py-3 border-b border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <div class="text-xs text-slate-400 mb-1">策略名称</div>
-                    <input id="strategy-create-name" type="text" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-slate-100" placeholder="例如：AI动量突破策略">
+                    <input id="strategy-create-name" type="text" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-slate-100" placeholder="例如：智能动量突破策略">
                 </div>
                 <div class="flex items-end gap-2">
-                    <button onclick="analyzeStrategyTemplate()" class="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1.5 rounded text-xs border border-cyan-500"><i class="fa-solid fa-robot mr-1"></i>AI分析</button>
+                    <button onclick="analyzeStrategyTemplate()" class="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1.5 rounded text-xs border border-cyan-500"><i class="fa-solid fa-robot mr-1"></i>智能分析</button>
                     <div id="strategy-create-status" class="text-xs text-slate-400">待输入策略模版</div>
                 </div>
             </div>
@@ -734,11 +731,11 @@
                 <div class="border-r border-slate-700 p-3 flex flex-col gap-2">
                     <div class="text-xs text-slate-300">策略模版</div>
                     <textarea id="strategy-template-input" class="h-40 w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs font-mono text-slate-200" placeholder="请粘贴或输入你的策略思路、入场条件、离场条件、风控规则"></textarea>
-                    <div class="text-xs text-slate-300">代码模版（供AI参考）</div>
-                    <textarea id="strategy-code-template-input" class="flex-1 w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs font-mono text-cyan-200" placeholder="可按项目规范调整代码骨架，帮助AI按模板产出"></textarea>
+                    <div class="text-xs text-slate-300">代码模版（供智能分析参考）</div>
+                    <textarea id="strategy-code-template-input" class="flex-1 w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs font-mono text-cyan-200" placeholder="可按项目规范调整代码骨架，帮助智能分析按模板产出"></textarea>
                 </div>
                 <div class="p-3 flex flex-col gap-2">
-                    <div class="text-xs text-slate-300">AI分析结论</div>
+                    <div class="text-xs text-slate-300">智能分析结论</div>
                     <div id="strategy-analysis-output" class="h-24 overflow-auto bg-slate-950 border border-slate-700 rounded p-2 text-xs text-slate-300 whitespace-pre-wrap"></div>
                     <div class="text-xs text-slate-300">可执行策略代码</div>
                     <textarea id="strategy-code-output" class="flex-1 w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs font-mono text-emerald-200"></textarea>
@@ -764,7 +761,7 @@
                 </div>
                 <div class="bg-slate-800/70 border border-slate-700 rounded p-2">
                     <div class="text-slate-400 mb-1">接口延迟</div>
-                    <div id="debug-api-latency" class="font-mono text-cyan-300">-- ms</div>
+                    <div id="debug-api-latency" class="font-mono text-cyan-300">-- 毫秒</div>
                 </div>
             </div>
             <div class="bg-slate-800/70 border border-slate-700 rounded p-2">
@@ -800,13 +797,13 @@
         let wsReconnectAttempts = 0;
         let wsLastPongAt = 0;
         const WS_HEARTBEAT_INTERVAL_MS = 15000;
-        const WS_STALE_TIMEOUT_MS = 90000;
+        const WS_STALE_TIMEOUT_MS = 180000;
         const WS_RECONNECT_MAX_DELAY_MS = 10000;
         const RENDER_LOOP_INTERVAL_MS = 50;
         const RENDER_HIGH_BUDGET = 20;
         const RENDER_NORMAL_BUDGET = 30;
         const RENDER_QUEUE_MAX = 1500;
-        const RENDER_CRITICAL_TYPES = new Set(['system', 'backtest_result', 'backtest_failed', 'backtest_strategy_report']);
+        const RENDER_CRITICAL_TYPES = new Set(['system', 'backtest_result', 'backtest_failed', 'backtest_strategy_report', 'menxia', 'shangshu']);
         const RENDER_COALESCE_TYPES = new Set(['market', 'live_tick', 'ministry_tick', 'backtest_progress']);
         const renderHighQueue = [];
         const renderNormalQueue = [];
@@ -1101,26 +1098,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
 
         function enqueueIncomingEvent(payload) {
             if (!payload || typeof payload !== 'object') return;
-            const type = String(payload.type || '');
-            if (!type) return;
-            if (RENDER_CRITICAL_TYPES.has(type)) {
-                renderHighQueue.push(payload);
-                ensureRenderLoop();
-                return;
-            }
-            if (RENDER_COALESCE_TYPES.has(type)) {
-                renderCoalesceMap.set(type, payload);
-                ensureRenderLoop();
-                return;
-            }
-            if (renderNormalQueue.length < RENDER_QUEUE_MAX) {
-                renderNormalQueue.push(payload);
-            } else {
-                if (type === 'backtest_flow') return;
-                renderNormalQueue.shift();
-                renderNormalQueue.push(payload);
-            }
-            ensureRenderLoop();
+            handleEvent(payload);
         }
 
         function connectWebSocket() {
@@ -1222,14 +1200,14 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     if (data.decision === 'approved') {
                         DIAG_STATE.riskApproved += 1;
                         BT_STATE.approvedSignals += 1;
-                        document.getElementById('rites-compliance-status').innerText = 'PASS';
+                        document.getElementById('rites-compliance-status').innerText = '通过';
                         document.getElementById('rites-compliance-status').className = 'text-trading-green';
                         updateConfidenceScore();
                     }
                     if (data.decision === 'rejected') {
                         DIAG_STATE.riskRejected += 1;
                         BT_STATE.rejectedSignals += 1;
-                        document.getElementById('rites-compliance-status').innerText = 'REJECT';
+                        document.getElementById('rites-compliance-status').innerText = '驳回';
                         document.getElementById('rites-compliance-status').className = 'text-trading-red';
                         const item = `[${getTime()}] [${data.strategy_id || '--'}] ${data.reason || data.msg || '风控拒绝'}`;
                         DIAG_STATE.riskRejects.unshift(item);
@@ -1424,7 +1402,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (!liveEnabled) return;
             if (liveActionPending) return;
             if (!ws || ws.readyState !== WebSocket.OPEN) {
-                logMessage('SYSTEM', 'WebSocket 未连接，无法切换 Live', 'danger');
+                logMessage('SYSTEM', 'WebSocket 未连接，无法切换实盘', 'danger');
                 return;
             }
             const raw = document.getElementById('stock-search-input').value || '';
@@ -1578,7 +1556,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (!text || !badge || !btn || !icon || !label) return;
             if (!liveEnabled) {
                 text.className = 'text-slate-500';
-                text.innerText = 'Live已关闭';
+                text.innerText = '实盘已关闭';
                 badge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400';
                 badge.innerText = '已关闭';
                 btn.disabled = true;
@@ -1602,7 +1580,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 badge.innerText = '运行中';
                 btn.className = 'bg-trading-red hover:bg-rose-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-rose-500 hover:-translate-y-0.5 active:scale-95 min-w-[128px]';
                 icon.className = 'fa-solid fa-stop';
-                label.innerText = '停止 Live';
+                label.innerText = '停止实盘';
                 btn.disabled = false;
             } else {
                 text.className = 'text-slate-300';
@@ -1611,7 +1589,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 badge.innerText = '待机';
                 btn.className = 'bg-trading-green hover:bg-emerald-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-emerald-500 hover:-translate-y-0.5 active:scale-95 min-w-[128px]';
                 icon.className = 'fa-solid fa-satellite-dish';
-                label.innerText = '启动 Live';
+                label.innerText = '启动实盘';
                 btn.disabled = false;
             }
         }
@@ -1666,7 +1644,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 conn.innerText = DIAG_STATE.wsConnected ? '已连接' : '已断开';
             }
             if (latency) {
-                latency.innerText = DIAG_STATE.apiLatencyMs === null ? '-- ms' : `${DIAG_STATE.apiLatencyMs} ms`;
+                latency.innerText = DIAG_STATE.apiLatencyMs === null ? '-- 毫秒' : `${DIAG_STATE.apiLatencyMs} 毫秒`;
             }
             if (tick) {
                 tick.innerText = `${DIAG_STATE.tickTriggerText}\n${DIAG_STATE.tickStrategyText}`;
@@ -1760,10 +1738,10 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 title: '系统总控',
                 subtitle: '运行模式与全局开关',
                 fields: [
-                    { path: 'system.mode', label: '运行模式', type: 'select', options: [{ value: 'backtest', label: 'backtest 回测' }, { value: 'live', label: 'live 实时' }] },
-                    { path: 'system.enable_live', label: '启用 Live', type: 'boolean' },
+                    { path: 'system.mode', label: '运行模式', type: 'select', options: [{ value: 'backtest', label: '回测模式' }, { value: 'live', label: '实盘模式' }] },
+                    { path: 'system.enable_live', label: '启用实盘', type: 'boolean' },
                     { path: 'system.initial_capital', label: '系统初始资金', type: 'number', unit: '元', min: 10000, max: 100000000, step: 10000, slider: true },
-                    { path: 'system.log_level', label: '日志级别', type: 'select', options: [{ value: 'DEBUG', label: 'DEBUG' }, { value: 'INFO', label: 'INFO' }, { value: 'WARNING', label: 'WARNING' }, { value: 'ERROR', label: 'ERROR' }] }
+                    { path: 'system.log_level', label: '日志级别', type: 'select', options: [{ value: 'DEBUG', label: '调试' }, { value: 'INFO', label: '信息' }, { value: 'WARNING', label: '警告' }, { value: 'ERROR', label: '错误' }] }
                 ]
             },
             {
@@ -1779,12 +1757,12 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 fields: [
                     { path: 'data_provider.source', label: '主数据源', type: 'select', options: [{ value: 'default', label: 'default' }, { value: 'akshare', label: 'akshare' }, { value: 'tushare', label: 'tushare' }] },
                     { path: 'data_provider.enable_fallback', label: '启用数据回退', type: 'boolean' },
-                    { path: 'data_provider.tushare_token', label: 'Tushare Token', type: 'text' },
-                    { path: 'data_provider.default_api_key', label: 'Default API Key', type: 'text' },
-                    { path: 'data_provider.default_api_url', label: 'Default API URL', type: 'text' },
-                    { path: 'data_provider.llm_api_url', label: 'AI服务URL(OpenAI兼容)', type: 'text' },
-                    { path: 'data_provider.llm_api_key', label: 'AI服务API Key', type: 'text' },
-                    { path: 'data_provider.llm_model', label: 'AI模型名', type: 'text' }
+                    { path: 'data_provider.tushare_token', label: 'Tushare令牌', type: 'text' },
+                    { path: 'data_provider.default_api_key', label: '默认数据服务密钥', type: 'text' },
+                    { path: 'data_provider.default_api_url', label: '默认数据服务地址', type: 'text' },
+                    { path: 'data_provider.llm_api_url', label: '智能服务地址（OpenAI兼容）', type: 'text' },
+                    { path: 'data_provider.llm_api_key', label: '智能服务访问密钥', type: 'text' },
+                    { path: 'data_provider.llm_model', label: '智能模型名称', type: 'text' }
                 ]
             },
             {
@@ -2307,7 +2285,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             const modal = document.getElementById('strategy-create-modal');
             if (modal) modal.classList.remove('hidden');
             const status = document.getElementById('strategy-create-status');
-            if (status) status.innerText = '输入策略模版后点击AI分析';
+            if (status) status.innerText = '输入策略模版后点击智能分析';
             const analysis = document.getElementById('strategy-analysis-output');
             if (analysis) analysis.innerText = '';
             const code = document.getElementById('strategy-code-output');
@@ -2315,7 +2293,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             const codeTpl = document.getElementById('strategy-code-template-input');
             if (codeTpl && !String(codeTpl.value || '').trim()) codeTpl.value = STRATEGY_CODE_TEMPLATE_DEFAULT;
             const nameInput = document.getElementById('strategy-create-name');
-            if (nameInput && !nameInput.value) nameInput.value = `AI策略${Date.now().toString().slice(-4)}`;
+            if (nameInput && !nameInput.value) nameInput.value = `智能策略${Date.now().toString().slice(-4)}`;
         }
 
         function closeStrategyCreateModal() {
@@ -2336,7 +2314,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 return;
             }
             try {
-                if (status) status.innerText = 'AI分析中...';
+                if (status) status.innerText = '智能分析中...';
                 const res = await fetch('/api/strategy_manager/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2347,7 +2325,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     })
                 });
                 const data = await res.json();
-                if (data.status !== 'success') throw new Error(data.msg || 'AI分析失败');
+                if (data.status !== 'success') throw new Error(data.msg || '智能分析失败');
                 pendingGeneratedStrategy = {
                     strategy_id: String(data.strategy_id || ''),
                     strategy_name: String(data.strategy_name || strategyName || ''),
@@ -2361,7 +2339,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 if (code) code.value = String(data.code || '');
                 if (status) status.innerText = `已生成策略 ${pendingGeneratedStrategy.strategy_id}`;
             } catch (e) {
-                if (status) status.innerText = `AI分析失败: ${e}`;
+                if (status) status.innerText = `智能分析失败: ${e}`;
             }
         }
 
@@ -2376,7 +2354,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             const nameInput = document.getElementById('strategy-create-name');
             const nameText = String(nameInput?.value || '').trim();
             if (!pendingGeneratedStrategy || !pendingGeneratedStrategy.strategy_id) {
-                if (status) status.innerText = '请先点击AI分析生成策略代码';
+                if (status) status.innerText = '请先点击智能分析生成策略代码';
                 return;
             }
             if (!codeText) {
@@ -2694,6 +2672,8 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (txt) txt.innerText = '初始化中...';
             if (dt) dt.innerText = dates.start;
             if (bar) bar.style.width = '0%';
+            const timeEl = document.getElementById('war-time');
+            if (timeEl) timeEl.innerText = '--';
             setBacktestButtonState(BACKTEST_BTN_STATE.running);
             try {
                 if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -2769,7 +2749,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (p > 0 && p < 100) {
                 const heat = Math.min(100, Math.max(0, BT_STATE.approvedSignals - BT_STATE.rejectedSignals + 50));
                 const temp = document.getElementById('rites-market-temp');
-                if (temp) temp.innerText = `🔥 ${Math.round(heat)} (Backtest)`;
+                if (temp) temp.innerText = `🔥 ${Math.round(heat)}（回测）`;
             }
         }
 
@@ -2806,15 +2786,19 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             const price = Number(data.price || 0).toFixed(2);
             const qty = data.qty || 0;
             const strategy = data.strategy || '--';
+            const tradeDt = formatDateTime(data.dt);
+            const dirText = dir === 'BUY' ? '买入' : (dir === 'SELL' ? '卖出' : dir);
             const actionEl = document.getElementById('war-action');
             if (actionEl) {
-                actionEl.innerText = dir;
+                actionEl.innerText = dirText;
                 actionEl.className = `font-bold ${dir === 'BUY' ? 'text-trading-green' : 'text-trading-red'}`;
             }
             setMetricText('war-price', price, Number(price));
+            const timeEl = document.getElementById('war-time');
+            if (timeEl) timeEl.innerText = tradeDt;
             BT_STATE.totalTrades += 1;
             pulsePanel('panel-bing');
-            logMessage('尚书省', `[${strategy}] ${dir} ${code} @ ${price} x ${qty}`, dir === 'BUY' ? 'success' : 'warning');
+            logMessage('尚书省', `[${strategy}] ${dirText} ${code} @ ${price} x ${qty}`, dir === 'BUY' ? 'success' : 'warning');
             updateConfidenceScore();
         }
 
@@ -2829,7 +2813,12 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             }
             if (data.main_strategy) {
                 const ms = document.getElementById('personnel-main-strategy');
-                if (ms) ms.innerText = `Strategy-${data.main_strategy}`;
+                if (ms) {
+                    const sid = String(data.main_strategy || '').trim();
+                    const fromCatalog = strategyCatalog.find(s => String(s.id) === sid)?.name;
+                    const fromGuide = (STRATEGY_GUIDE[sid] && STRATEGY_GUIDE[sid].name) ? STRATEGY_GUIDE[sid].name : '';
+                    ms.innerText = fromCatalog || fromGuide || sid || '--';
+                }
             }
             if (data.drawdown_pct !== undefined) {
                 const dd = document.getElementById('justice-dd-current');
@@ -2842,7 +2831,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (data.compliance_status) {
                 const c = document.getElementById('rites-compliance-status');
                 if (c) {
-                    c.innerText = data.compliance_status;
+                    c.innerText = data.compliance_status === 'PASS' ? '通过' : (data.compliance_status === 'REJECT' ? '驳回' : data.compliance_status);
                     c.className = data.compliance_status === 'PASS' ? 'text-trading-green' : 'text-trading-red';
                 }
             }
@@ -2920,7 +2909,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             const dt = document.getElementById('backtest-date-display');
             const bar = document.getElementById('backtest-progress-bar');
             if (txt) txt.innerText = '回测完成 100%';
-            if (dt) dt.innerText = 'Done';
+            if (dt) dt.innerText = '已完成';
             if (bar) bar.style.width = '100%';
             const selected = selectedStrategyIds.length ? selectedStrategyIds : strategyCatalog.map(s => String(s.id));
             logMessage('回测', `回测完成：${data.stock}，策略周期：${buildStrategyPeriodText(selected)}`, 'success');
@@ -3012,11 +3001,24 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
 
         // UI Helpers
         const getTime = () => new Date().toLocaleTimeString('en-GB', { hour12: false });
+        const formatDateTime = (v) => {
+            if (!v) return '--';
+            const d = new Date(v);
+            if (Number.isNaN(d.getTime())) return String(v);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mi = String(d.getMinutes()).padStart(2, '0');
+            const ss = String(d.getSeconds()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+        };
         
         function logMessage(module, message, type = 'info') {
             const timeline = document.getElementById('imperial-timeline');
             const el = document.createElement('div');
             el.className = 'flex gap-2 animate-pulse';
+            const moduleText = String(module || '') === 'SYSTEM' ? '系统' : module;
             
             let color = 'text-slate-300';
             if (type === 'success') color = 'text-trading-green';
@@ -3026,7 +3028,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
 
             el.innerHTML = `
                 <span class="text-slate-500">[${getTime()}]</span>
-                <span class="font-bold w-16 text-right ${color}">${module}</span>
+                <span class="font-bold w-16 text-right ${color}">${moduleText}</span>
                 <span class="text-slate-200 flex-1">${message}</span>
             `;
             

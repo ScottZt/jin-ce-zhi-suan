@@ -259,6 +259,14 @@ class LiveCabinet:
                 print(f"⏳ 等待K线更新... (当前: {current_dt})", end='\r')
                 return
             self.last_dt = current_dt
+        if "volume" not in bar and "vol" in bar:
+            bar["volume"] = bar["vol"]
+        if "vol" not in bar and "volume" in bar:
+            bar["vol"] = bar["volume"]
+        if "turnover" not in bar and "amount" in bar:
+            bar["turnover"] = bar["amount"]
+        if "amount" not in bar and "turnover" in bar:
+            bar["amount"] = bar["turnover"]
 
         # Emit Market Data Event
         await self._emit_event('market', {
