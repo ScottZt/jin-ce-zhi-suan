@@ -11,7 +11,7 @@ class DataProvider:
     Data Provider using external API for multi-timeframe K-line data.
     """
     def __init__(self, api_key=None, base_url=None):
-        cfg = ConfigLoader()
+        cfg = ConfigLoader.reload()
         self.api_key = api_key or cfg.get("data_provider.default_api_key", "")
         self.base_url = (base_url or cfg.get("data_provider.default_api_url", "")).rstrip("/")
         self.headers = {"X-API-Key": self.api_key} if self.api_key else {}

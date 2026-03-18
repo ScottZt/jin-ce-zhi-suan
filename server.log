@@ -1,0 +1,70 @@
+/Users/lidong/Desktop/三省六部回测内阁/server.py:632: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+/Users/lidong/Desktop/三省六部回测内阁/server.py:648: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+✅ Loaded 5489 stocks from local cache.
+INFO:     Started server process [37067]
+INFO:     Waiting for application startup.
+2026-03-17 22:19:18,873 - CabinetServer - INFO - Initializing Cabinet Server...
+2026-03-17 22:19:18,875 - CabinetServer - INFO - --- Registered API Endpoints ---
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'HEAD', 'GET'} /openapi.json
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'HEAD', 'GET'} /docs
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'HEAD', 'GET'} /docs/oauth2-redirect
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'HEAD', 'GET'} /redoc
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'GET'} /
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'GET'} /report
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'GET'} /api/search
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'GET'} /api/strategies
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'GET'} /api/config
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'POST'} /api/config/save
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'GET'} /api/report/latest
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'GET'} /api/report/history
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'GET'} /api/report/{report_id}
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'POST'} /api/control/start_backtest
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'POST'} /api/control/start_live
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'POST'} /api/control/stop
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'POST'} /api/control/switch_strategy
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'POST'} /api/control/set_source
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'POST'} /api/control/reload_strategies
+2026-03-17 22:19:18,875 - CabinetServer - INFO - {'GET'} /api/status
+2026-03-17 22:19:18,875 - CabinetServer - INFO - --------------------------------
+2026-03-17 22:19:18,875 - CabinetServer - INFO - Loaded 10 Strategies: ['长期持有一次买入', '三周期共振波段', '短线弱转强烂板', 'ETF行业轮动', '龙头首阴反包', '3N法则主升浪', '海豚交易法', '跳空交易系统', '神奇九转', '箱体降本策略']
+2026-03-17 22:19:18,875 - CabinetServer - INFO - Server Started. Access dashboard at http://localhost:8000
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-03-17 22:19:23,371 - CabinetServer - INFO - Incoming Request: GET /api/status
+2026-03-17 22:19:23,378 - CabinetServer - INFO - Response Status: 200
+INFO:     127.0.0.1:53979 - "GET /api/status HTTP/1.1" 200 OK
+2026-03-17 22:19:25,781 - CabinetServer - INFO - Incoming Request: POST /api/control/start_backtest
+Starting Backtest for 301227.SH
+Fetching data for 301227.SH from 2025-03-17 00:00:00 to 2026-03-17 00:00:00...
+2026-03-17 22:24:01,383 - CabinetServer - INFO - Response Status: 200
+INFO:     127.0.0.1:53983 - "POST /api/control/start_backtest HTTP/1.1" 200 OK
+2026-03-17 22:24:01,396 - CabinetServer - INFO - Incoming Request: GET /api/status
+2026-03-17 22:24:01,396 - CabinetServer - INFO - Incoming Request: POST /api/control/start_backtest
+2026-03-17 22:24:01,397 - CabinetServer - INFO - Incoming Request: GET /api/report/latest
+2026-03-17 22:24:01,397 - CabinetServer - INFO - Incoming Request: GET /api/status
+2026-03-17 22:24:01,397 - CabinetServer - INFO - Incoming Request: POST /api/control/stop
+2026-03-17 22:24:01,397 - CabinetServer - INFO - Incoming Request: GET /api/status
+2026-03-17 22:24:01,397 - CabinetServer - INFO - Incoming Request: GET /api/report/819064
+2026-03-17 22:24:01,398 - CabinetServer - INFO - Incoming Request: GET /api/status
+2026-03-17 22:24:01,398 - CabinetServer - INFO - Incoming Request: GET /api/status
+2026-03-17 22:24:01,411 - CabinetServer - INFO - Response Status: 200
+2026-03-17 22:24:01,411 - CabinetServer - INFO - Response Status: 200
+2026-03-17 22:24:01,411 - CabinetServer - INFO - Response Status: 200
+2026-03-17 22:24:01,412 - CabinetServer - INFO - Response Status: 200
+2026-03-17 22:24:01,412 - CabinetServer - INFO - Response Status: 200
+2026-03-17 22:24:01,412 - CabinetServer - INFO - Response Status: 200
+2026-03-17 22:24:01,412 - CabinetServer - INFO - Response Status: 200
+2026-03-17 22:24:01,412 - CabinetServer - INFO - Response Status: 200
+INFO:     127.0.0.1:54307 - "GET /api/status HTTP/1.1" 200 OK

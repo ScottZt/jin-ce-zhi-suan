@@ -7,7 +7,7 @@
   },
   "data_provider": {
     "source": "default",
-    "enable_fallback": true,
+    "enable_fallback": false,
     "tushare_token": "4ba065ecb8eebdebc93dffaef6bc051eeb3a98b46eb7d94fd697282f",
     "default_api_key": "abc123",
     "default_api_url": "https://tactics-ireland-ash-nato.trycloudflare.com"

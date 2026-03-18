@@ -113,14 +113,17 @@ def _sanitize_non_finite(obj):
         return v if math.isfinite(v) else 0.0
     return obj
 
-def start_new_backtest_report(stock_code, strategy_id):
+def start_new_backtest_report(stock_code, strategy_id, request_payload=None):
     global current_backtest_report, latest_backtest_result, latest_strategy_reports, current_backtest_progress
-    report_id = str(int(asyncio.get_event_loop().time() * 1000))
+    report_id = f"{int(datetime.now().timestamp() * 1000)}-{os.urandom(2).hex()}"
     current_backtest_report = {
         "report_id": report_id,
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "stock_code": stock_code,
         "strategy_id": strategy_id,
+        "status": "running",
+        "error_msg": None,
+        "request": request_payload if isinstance(request_payload, dict) else {},
         "summary": None,
         "ranking": [],
         "strategy_reports": {}
@@ -134,9 +137,20 @@ def finalize_current_backtest_report():
     global report_history, current_backtest_report
     if not current_backtest_report:
         return
+    if not current_backtest_report.get("finished_at"):
+        current_backtest_report["finished_at"] = datetime.now().isoformat(timespec="seconds")
     report_history = [r for r in report_history if r.get("report_id") != current_backtest_report.get("report_id")]
     report_history.insert(0, current_backtest_report)
     persist_report_history()
+
+def fail_current_backtest_report(msg):
+    global current_backtest_report
+    if not current_backtest_report:
+        return
+    current_backtest_report["status"] = "failed"
+    current_backtest_report["error_msg"] = str(msg)
+    current_backtest_report["finished_at"] = datetime.now().isoformat(timespec="seconds")
+    finalize_current_backtest_report()
 
 # --- WebSocket Manager ---
 async def connect(websocket: WebSocket):
@@ -283,6 +297,9 @@ async def api_latest_report():
         reports = [v for v in strategy_reports.values() if isinstance(v, dict)]
         reports = sorted(reports, key=lambda x: str(x.get("strategy_id", "")))
         payload = {
+            "report_id": first.get("report_id") if isinstance(first, dict) else None,
+            "status": first.get("status") if isinstance(first, dict) else None,
+            "error_msg": first.get("error_msg") if isinstance(first, dict) else None,
             "summary": summary,
             "ranking": ranking if isinstance(ranking, list) else [],
             "strategy_reports": reports
@@ -312,6 +329,9 @@ async def api_report_history():
             items.append({
                 "report_id": r.get("report_id"),
                 "created_at": r.get("created_at"),
+                "finished_at": r.get("finished_at"),
+                "status": r.get("status", "success" if r.get("summary") else "failed"),
+                "error_msg": r.get("error_msg"),
                 "stock_code": r.get("stock_code") or summary.get("stock"),
                 "period": summary.get("period"),
                 "total_trades": summary.get("total_trades", 0)
@@ -334,7 +354,17 @@ async def api_report_detail(report_id: str):
                 strategy_reports = r.get("strategy_reports") if isinstance(r.get("strategy_reports"), dict) else {}
                 reports = [v for v in strategy_reports.values() if isinstance(v, dict)]
                 reports = sorted(reports, key=lambda x: str(x.get("strategy_id", "")))
-                payload = {"summary": summary, "ranking": ranking, "strategy_reports": reports}
+                payload = {
+                    "report_id": r.get("report_id"),
+                    "created_at": r.get("created_at"),
+                    "finished_at": r.get("finished_at"),
+                    "status": r.get("status", "success" if summary else "failed"),
+                    "error_msg": r.get("error_msg"),
+                    "request": r.get("request") if isinstance(r.get("request"), dict) else {},
+                    "summary": summary,
+                    "ranking": ranking,
+                    "strategy_reports": reports
+                }
                 payload = _sanitize_non_finite(payload)
                 safe_payload = _safe_json_obj(payload)
                 if isinstance(safe_payload, dict):
@@ -354,7 +384,15 @@ async def api_start_backtest(req: BacktestRequest):
     global cabinet_task
     if cabinet_task and not cabinet_task.done():
         cabinet_task.cancel()
-    report_id = start_new_backtest_report(req.stock_code, req.strategy_id)
+    report_id = start_new_backtest_report(req.stock_code, req.strategy_id, {
+        "stock_code": req.stock_code,
+        "strategy_id": req.strategy_id,
+        "strategy_ids": req.strategy_ids,
+        "strategy_mode": req.strategy_mode,
+        "start": req.start,
+        "end": req.end,
+        "capital": req.capital
+    })
     cabinet_task = asyncio.create_task(run_backtest_task(req.stock_code, req.strategy_id, req.strategy_mode, req.start, req.end, req.capital, req.strategy_ids))
     return {"status": "success", "msg": f"Backtest started for {req.stock_code}", "report_id": report_id}
 
@@ -449,7 +487,9 @@ async def api_get_status():
         "provider_source": current_provider_source or config.get("data_provider.source", "default"),
         "live_enabled": is_live_enabled(),
         "progress": current_backtest_progress,
-        "current_report_id": current_backtest_report.get("report_id") if current_backtest_report else None
+        "current_report_id": current_backtest_report.get("report_id") if current_backtest_report else None,
+        "current_report_status": current_backtest_report.get("status") if current_backtest_report else None,
+        "current_report_error": current_backtest_report.get("error_msg") if current_backtest_report else None
     }
 
 
@@ -524,7 +564,15 @@ async def websocket_endpoint(websocket: WebSocket):
                     
                     if cabinet_task and not cabinet_task.done():
                         cabinet_task.cancel()
-                    start_new_backtest_report(stock_code, strategy_id)
+                    start_new_backtest_report(stock_code, strategy_id, {
+                        "stock_code": stock_code,
+                        "strategy_id": strategy_id,
+                        "strategy_ids": strategy_ids,
+                        "strategy_mode": strategy_mode,
+                        "start": start,
+                        "end": end,
+                        "capital": capital
+                    })
                         
                     cabinet_task = asyncio.create_task(run_backtest_task(stock_code, strategy_id, strategy_mode, start, end, capital, strategy_ids))
                 
@@ -601,8 +649,14 @@ async def run_backtest_task(stock_code, strategy_id, strategy_mode=None, start=N
         if end:
             end_dt = datetime.strptime(end, "%Y-%m-%d")
         await cab.run(start_date=start_dt, end_date=end_dt)
+        if current_backtest_report and current_backtest_report.get("status") == "running" and not current_backtest_report.get("summary"):
+            fail_current_backtest_report("backtest finished without report summary")
     except asyncio.CancelledError:
         print("Backtest Task Cancelled")
+        fail_current_backtest_report("backtest task cancelled")
+    except Exception as e:
+        logger.error(f"run_backtest_task failed: {e}", exc_info=True)
+        fail_current_backtest_report(str(e))
 
 async def emit_event_to_ws(event_type, data):
     global latest_backtest_result, latest_strategy_reports, current_backtest_report, current_backtest_progress
@@ -611,11 +665,17 @@ async def emit_event_to_ws(event_type, data):
         if current_backtest_report is not None:
             current_backtest_report["summary"] = data
             current_backtest_report["ranking"] = data.get("ranking", [])
+            current_backtest_report["status"] = "success"
+            current_backtest_report["error_msg"] = None
+            current_backtest_report["finished_at"] = datetime.now().isoformat(timespec="seconds")
             finalize_current_backtest_report()
-        # Mark progress as done
         current_backtest_progress = {"progress": 100, "current_date": "Done"}
     elif event_type == "backtest_progress":
         current_backtest_progress = data
+    elif event_type == "backtest_failed":
+        msg = data.get("msg") if isinstance(data, dict) else str(data)
+        fail_current_backtest_report(msg)
+        current_backtest_progress = {"progress": current_backtest_progress.get("progress", 0), "current_date": "Failed"}
     elif event_type == "backtest_strategy_report":
         sid = str(data.get("strategy_id", ""))
         if sid:

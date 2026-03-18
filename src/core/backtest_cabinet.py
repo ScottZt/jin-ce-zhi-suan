@@ -28,7 +28,7 @@ class BacktestCabinet:
         self.event_callback = event_callback
         self.strategy_mode = strategy_mode
         self.strategy_ids = strategy_ids
-        self.config = ConfigLoader()
+        self.config = ConfigLoader.reload()
         
         # Initialize Ministries
         self.personnel = LiBuPersonnel()
@@ -130,7 +130,14 @@ class BacktestCabinet:
             provider_msg = ""
             if provider_source == "default" and hasattr(provider, "last_error") and provider.last_error:
                 provider_msg = f" 诊断: {provider.last_error}"
-            await self._emit('system', {'msg': f"❌ 无法获取 {self.stock_code} 的历史数据，回测终止。{provider_msg}"})
+            fail_msg = f"无法获取 {self.stock_code} 的历史数据，回测终止。{provider_msg}".strip()
+            await self._emit('system', {'msg': f"❌ {fail_msg}"})
+            await self._emit('backtest_failed', {
+                'msg': fail_msg,
+                'stock': self.stock_code,
+                'period': f"{start_date.date()} - {end_date.date()}",
+                'provider_source': provider_source
+            })
             return
 
         df = self.works.clean_data(df)
