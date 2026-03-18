@@ -68,9 +68,34 @@
             </div>
         </div>
     </div>
+    <div id="trade-detail-modal" class="fixed inset-0 bg-black/60 hidden z-50 items-center justify-center p-4">
+        <div class="w-full max-w-5xl bg-slate-900 border border-slate-700 rounded-lg shadow-2xl overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+                <div class="text-white font-semibold text-base" id="trade-detail-title">交易明细</div>
+                <button id="trade-detail-close-btn" class="text-slate-400 hover:text-white text-lg leading-none">×</button>
+            </div>
+            <div class="max-h-[70vh] overflow-auto">
+                <table class="w-full text-sm">
+                    <thead class="text-slate-400 bg-slate-800/80 sticky top-0">
+                        <tr>
+                            <th class="px-3 py-2 text-left">时间</th>
+                            <th class="px-3 py-2 text-left">方向</th>
+                            <th class="px-3 py-2 text-right">价格</th>
+                            <th class="px-3 py-2 text-right">数量</th>
+                            <th class="px-3 py-2 text-right">成交额</th>
+                            <th class="px-3 py-2 text-right">费用</th>
+                            <th class="px-3 py-2 text-right">已实现盈亏</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trade-detail-body" class="divide-y divide-slate-800"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
     <script>
         let currentReportId = null;
+        const strategyReportMap = {};
         const STRATEGY_NAME_MAP = {
             "01": "三周期共振波段",
             "02": "短线弱转强烂板",
@@ -188,7 +213,7 @@
                     <td class="px-3 py-2 font-mono">${sid}</td>
                     <td class="px-3 py-2">${STRATEGY_PERIOD_MAP[sid] || '--'}</td>
                     <td class="px-3 py-2">${r.rating ?? '-'}</td>
-                    <td class="px-3 py-2 ${roi >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${(roi*100).toFixed(2)}%</td>
+                    <td class="px-3 py-2 ${roi >= 0 ? 'text-rose-400' : 'text-emerald-400'}">${(roi*100).toFixed(2)}%</td>
                     <td class="px-3 py-2 text-rose-300">${(dd*100).toFixed(2)}%</td>
                     <td class="px-3 py-2 text-cyan-300">${(winRate*100).toFixed(2)}%</td>
                     <td class="px-3 py-2">${Number(r.calmar || 0).toFixed(2)}</td>
@@ -200,7 +225,7 @@
                 card.innerHTML = `
                     <div class="text-white font-semibold mb-1">#${r.rank ?? '-'} 策略 ${sid} · ${r.rating ?? '-'}</div>
                     <div class="text-slate-300">使用周期：${STRATEGY_PERIOD_MAP[sid] || '--'}</div>
-                    <div class="${roi >= 0 ? 'text-emerald-400' : 'text-rose-400'}">年化收益：${(roi*100).toFixed(2)}%</div>
+                    <div class="${roi >= 0 ? 'text-rose-400' : 'text-emerald-400'}">年化收益：${(roi*100).toFixed(2)}%</div>
                     <div class="text-rose-300">最大回撤：${(dd*100).toFixed(2)}%</div>
                     <div class="text-cyan-300">胜率：${(winRate*100).toFixed(2)}%</div>
                     <div class="text-slate-300">卡玛：${Number(r.calmar || 0).toFixed(2)}</div>
@@ -229,7 +254,7 @@
                     本次回测状态：<span class="font-semibold text-blue-300">${netState}</span>。 
                     最佳策略为 <span class="font-semibold text-emerald-300">${best.strategy_id || '--'}</span>，
                     评级 <span class="font-semibold text-yellow-300">${best.rating || '--'}</span>，
-                    年化收益 <span class="font-semibold ${(Number(best.annualized_roi || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300')}">${(Number(best.annualized_roi || 0) * 100).toFixed(2)}%</span>。
+                    年化收益 <span class="font-semibold ${(Number(best.annualized_roi || 0) >= 0 ? 'text-rose-300' : 'text-emerald-300')}">${(Number(best.annualized_roi || 0) * 100).toFixed(2)}%</span>。
                     当前有 <span class="font-semibold text-cyan-300">${activeCount}</span>/<span class="font-semibold text-cyan-300">${total}</span> 个策略产生实盘级成交。
                 </div>
             `;
@@ -238,18 +263,21 @@
         function renderStrategyReports(reports) {
             const wrap = document.getElementById('strategy-report-list');
             wrap.innerHTML = '';
+            Object.keys(strategyReportMap).forEach(k => delete strategyReportMap[k]);
             if (!reports.length) {
                 wrap.innerHTML = '<div class="text-slate-500">暂无单策略报告</div>';
                 return;
             }
             reports.forEach(r => {
                 const sid = String(r.strategy_id);
+                strategyReportMap[sid] = r;
                 const sname = STRATEGY_NAME_MAP[sid] || "未知策略";
                 const card = document.createElement('div');
                 card.id = `strategy-${sid}`;
                 card.className = 'bg-slate-800/50 border border-slate-700 rounded-lg p-4 text-sm enter-anim transition-all duration-200 hover:border-slate-500 hover:-translate-y-0.5';
                 card.innerHTML = `
                     <div class="font-bold text-white mb-2">策略 ${sid} · ${sname}</div>
+                    <div class="mb-2"><button onclick="openTradeDetails('${sid}')" class="text-xs bg-blue-700 hover:bg-blue-600 text-white px-2 py-1 rounded border border-blue-600">交易明细</button></div>
                     <div class="text-slate-300">使用周期：${STRATEGY_PERIOD_MAP[sid] || '--'}</div>
                     <div class="text-slate-300">回测周期：${r.start_date} ~ ${r.end_date}</div>
                     <div class="text-slate-300">初始资金：${Number(r.init_capital || 0).toFixed(2)} 元</div>
@@ -267,6 +295,57 @@
             });
         }
 
+        function openTradeDetails(strategyId) {
+            const sid = String(strategyId || '');
+            const report = strategyReportMap[sid] || {};
+            const rows = Array.isArray(report.trade_details) ? report.trade_details : [];
+            const title = document.getElementById('trade-detail-title');
+            if (title) title.innerText = `策略 ${sid || '--'} 交易明细`;
+            const body = document.getElementById('trade-detail-body');
+            if (body) {
+                if (!rows.length) {
+                    body.innerHTML = '<tr><td colspan="7" class="px-3 py-6 text-center text-slate-500">暂无交易明细</td></tr>';
+                } else {
+                    body.innerHTML = rows.map(t => {
+                        const dt = String(t.dt || '--');
+                        const dir = String(t.direction || '--');
+                        const price = Number(t.price || 0);
+                        const qty = Number(t.quantity || 0);
+                        const amount = Number(t.amount || 0);
+                        const cost = Number(t.cost || 0);
+                        const pnl = Number(t.pnl || 0);
+                        const dirCls = dir === 'BUY' ? 'text-rose-300' : (dir === 'SELL' ? 'text-emerald-300' : 'text-slate-300');
+                        const dirText = dir === 'BUY' ? '买入' : (dir === 'SELL' ? '卖出' : dir);
+                        const pnlCls = pnl >= 0 ? 'text-rose-300' : 'text-emerald-300';
+                        return `
+                            <tr class="hover:bg-slate-800/40">
+                                <td class="px-3 py-2 text-slate-300 font-mono">${dt}</td>
+                                <td class="px-3 py-2 ${dirCls}">${dirText}</td>
+                                <td class="px-3 py-2 text-right text-slate-200">${price.toFixed(2)}</td>
+                                <td class="px-3 py-2 text-right text-slate-200">${qty}</td>
+                                <td class="px-3 py-2 text-right text-slate-200">${amount.toFixed(2)}</td>
+                                <td class="px-3 py-2 text-right text-slate-200">${cost.toFixed(2)}</td>
+                                <td class="px-3 py-2 text-right ${pnlCls}">${pnl.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            }
+            const modal = document.getElementById('trade-detail-modal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeTradeDetails() {
+            const modal = document.getElementById('trade-detail-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
         async function refreshAll() {
             await loadHistory();
             await loadReport(currentReportId || null);
@@ -279,6 +358,10 @@
             currentReportId = String(target.dataset.rid);
             await loadReport(currentReportId);
             await loadHistory();
+        });
+        document.getElementById('trade-detail-close-btn').addEventListener('click', closeTradeDetails);
+        document.getElementById('trade-detail-modal').addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'trade-detail-modal') closeTradeDetails();
         });
         setInterval(refreshAll, 15000);
         refreshAll();

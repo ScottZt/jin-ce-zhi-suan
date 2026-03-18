@@ -16,11 +16,22 @@ class ZhongshuSheng:
         signals = []
         runnable = set(runnable_strategy_ids) if runnable_strategy_ids else None
         ctx = strategy_context if isinstance(strategy_context, dict) else {}
+        strategy_ctx_map = {}
+        if isinstance(ctx.get("__by_strategy__"), dict):
+            strategy_ctx_map = ctx.get("__by_strategy__")
         for strategy in self.strategies:
             if runnable is not None and strategy.id not in runnable:
                 continue
-            if ctx and hasattr(strategy, "set_backtest_context"):
-                strategy.set_backtest_context(**ctx)
+            if hasattr(strategy, "set_backtest_context"):
+                scoped_ctx = {}
+                if strategy_ctx_map:
+                    scoped_ctx = strategy_ctx_map.get(strategy.id, {})
+                elif strategy.id in ctx and isinstance(ctx.get(strategy.id), dict):
+                    scoped_ctx = ctx.get(strategy.id)
+                else:
+                    scoped_ctx = ctx
+                if isinstance(scoped_ctx, dict) and scoped_ctx:
+                    strategy.set_backtest_context(**scoped_ctx)
             signal = strategy.on_bar(kline)
             if signal:
                 if "qty" not in signal or signal.get("qty") is None:

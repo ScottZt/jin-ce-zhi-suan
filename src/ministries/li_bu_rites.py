@@ -6,7 +6,7 @@ class LiBuRites:
     """
     礼部 (Rites): 生成每套策略独立业绩报表、排行榜
     """
-    def generate_report(self, strategy_id, hu_bu, xing_bu, initial_capital):
+    def generate_report(self, strategy_id, hu_bu, xing_bu, initial_capital, start_date=None, end_date=None):
         """
         Generate performance report for a single strategy.
         """
@@ -59,18 +59,18 @@ class LiBuRites:
         # Assuming we know the duration. But here we just have transactions.
         # We need start and end date of backtest.
         # Let's approximate using transaction dates range if available, else pass in duration.
-        if transactions:
-            start_date = min(t['dt'] for t in transactions)
-            end_date = max(t['dt'] for t in transactions)
-            days = (end_date - start_date).days
-            if days > 0:
-                annualized_roi = (1 + roi) ** (365 / days) - 1
-                if isinstance(annualized_roi, complex): # Handle negative base with fractional exponent
-                    annualized_roi = -1.0 # Or some error value
-            else:
-                annualized_roi = 0.0
+        if start_date is not None and end_date is not None:
+            days = max((end_date - start_date).days, 1)
+            annualized_roi = (1 + roi) ** (252 / days) - 1
+        elif transactions:
+            tx_start = min(t['dt'] for t in transactions)
+            tx_end = max(t['dt'] for t in transactions)
+            days = max((tx_end - tx_start).days, 1)
+            annualized_roi = (1 + roi) ** (252 / days) - 1
         else:
             annualized_roi = 0.0
+        if isinstance(annualized_roi, complex):
+            annualized_roi = -1.0
             
         # Sharpe Ratio
         # Need daily returns.
@@ -187,6 +187,17 @@ class LiBuRites:
         print(f"平均盈利：{avg_win:.2f}  | 平均亏损：{avg_loss:.2f}")
         print(f"盈亏比：{profit_ratio:.2f}")
         print("=" * 55 + "\n")
+        trade_details = []
+        for t in transactions:
+            trade_details.append({
+                "dt": str(t.get("dt", "")),
+                "direction": str(t.get("direction", "")),
+                "price": float(t.get("price", 0.0) or 0.0),
+                "quantity": int(t.get("quantity", 0) or 0),
+                "amount": float(t.get("amount", 0.0) or 0.0),
+                "cost": float(t.get("cost", 0.0) or 0.0),
+                "pnl": float(t.get("pnl", 0.0) or 0.0)
+            })
 
         return {
             "strategy_id": strategy_id,
@@ -203,5 +214,6 @@ class LiBuRites:
             "win_rate": win_rate,
             "avg_win": avg_win,
             "avg_loss": avg_loss,
-            "profit_ratio": profit_ratio
+            "profit_ratio": profit_ratio,
+            "trade_details": trade_details
         }

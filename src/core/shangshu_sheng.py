@@ -15,13 +15,14 @@ class ShangshuSheng:
         self.xing_bu = xing_bu
         self.positions = {} # Strategy ID -> {Stock Code -> Position Dict}
         
-    def execute_order(self, strategy_id, signal, kline):
+    def execute_order(self, strategy_id, signal, kline, hu_bu_account=None):
         """
         Execute an order (buy/sell).
         """
         direction = signal['direction']
         code = signal['code']
-        qty = signal['qty']
+        qty = int(signal['qty'])
+        hu_bu = hu_bu_account if hu_bu_account is not None else self.hu_bu
         
         # Simulate execution via War Ministry
         success, fill_price = self.bing_bu.match_order(signal, kline)
@@ -30,8 +31,29 @@ class ShangshuSheng:
             self.xing_bu.record_rejection(strategy_id, 'EXEC_FAIL', "Execution failed", kline['dt'])
             return False
 
+        if direction == 'BUY':
+            cash_available = float(hu_bu.cash)
+            if cash_available <= 0:
+                self.xing_bu.record_rejection(strategy_id, 'EXEC_NO_CASH', "No available cash", kline['dt'])
+                return False
+            amount_probe = fill_price * qty
+            cost_probe, _, _, _ = hu_bu.calculate_cost(amount_probe, direction, fill_price, qty)
+            if amount_probe + cost_probe > cash_available:
+                lo, hi = 0, qty
+                while lo < hi:
+                    mid = (lo + hi + 1) // 2
+                    mid_amount = fill_price * mid
+                    mid_cost, _, _, _ = hu_bu.calculate_cost(mid_amount, direction, fill_price, mid)
+                    if mid_amount + mid_cost <= cash_available:
+                        lo = mid
+                    else:
+                        hi = mid - 1
+                qty = lo
+                if qty <= 0:
+                    self.xing_bu.record_rejection(strategy_id, 'EXEC_NO_CASH', "Insufficient cash after fee/slippage", kline['dt'])
+                    return False
         amount = fill_price * qty
-        cost, comm, stamp, transfer = self.hu_bu.calculate_cost(amount, direction, fill_price, qty)
+        cost, comm, stamp, transfer = hu_bu.calculate_cost(amount, direction, fill_price, qty)
         
         # Update Position
         if direction == 'BUY':
@@ -58,7 +80,7 @@ class ShangshuSheng:
             pos['avg_price'] = new_avg
             pos['market_value'] = new_qty * fill_price # Mark to market immediately
             
-            self.hu_bu.record_transaction(strategy_id, kline['dt'], 'BUY', fill_price, qty, cost)
+            hu_bu.record_transaction(strategy_id, kline['dt'], 'BUY', fill_price, qty, cost)
 
         elif direction == 'SELL':
             if strategy_id not in self.positions or code not in self.positions[strategy_id]:
@@ -80,7 +102,7 @@ class ShangshuSheng:
             else:
                 pos['market_value'] = pos['qty'] * fill_price
 
-            self.hu_bu.record_transaction(strategy_id, kline['dt'], 'SELL', fill_price, qty, cost, pnl)
+            hu_bu.record_transaction(strategy_id, kline['dt'], 'SELL', fill_price, qty, cost, pnl)
             
         return True
 
@@ -95,6 +117,16 @@ class ShangshuSheng:
                     price = current_prices[code]
                     pos['market_value'] = pos['qty'] * price
                     total_value += pos['market_value']
+        return total_value
+
+    def update_strategy_holdings_value(self, strategy_id, current_prices):
+        total_value = 0.0
+        stocks = self.positions.get(strategy_id, {})
+        for code, pos in stocks.items():
+            if code in current_prices:
+                price = current_prices[code]
+                pos['market_value'] = pos['qty'] * price
+                total_value += pos['market_value']
         return total_value
 
     def check_stops(self, kline):

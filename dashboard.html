@@ -943,6 +943,9 @@
                     if ((data.msg || '').includes('回测完成')) {
                         setBacktestButtonState(BACKTEST_BTN_STATE.idle);
                     }
+                    if ((data.msg || '').includes('回测已手动终止')) {
+                        setBacktestButtonState(BACKTEST_BTN_STATE.idle);
+                    }
                     if ((data.msg || '').includes('实时监控已启动')) {
                         liveRunning = true;
                         liveActionPending = false;
@@ -1199,9 +1202,47 @@
         const searchInput = document.getElementById('stock-search-input');
         const resultsBox = document.getElementById('stock-search-results');
         let searchTimeout;
+        const CONSOLE_STATE_KEY = 'jince-console-state-v1';
+
+        function persistConsoleState() {
+            try {
+                const payload = {
+                    stock: String(searchInput?.value || '').trim(),
+                    range: String(document.getElementById('bt-range-select')?.value || '1y'),
+                    startDate: String(document.getElementById('bt-start-date')?.value || ''),
+                    endDate: String(document.getElementById('bt-end-date')?.value || ''),
+                    capital: String(document.getElementById('bt-capital-input')?.value || '')
+                };
+                localStorage.setItem(CONSOLE_STATE_KEY, JSON.stringify(payload));
+            } catch (_) {}
+        }
+
+        function restoreConsoleState() {
+            try {
+                const raw = localStorage.getItem(CONSOLE_STATE_KEY);
+                if (!raw) return;
+                const payload = JSON.parse(raw);
+                if (!payload || typeof payload !== 'object') return;
+                if (typeof payload.stock === 'string' && payload.stock.trim()) {
+                    searchInput.value = payload.stock.trim();
+                }
+                const rangeSel = document.getElementById('bt-range-select');
+                if (rangeSel && typeof payload.range === 'string' && payload.range) {
+                    const hasOption = Array.from(rangeSel.options || []).some(opt => opt.value === payload.range);
+                    if (hasOption) rangeSel.value = payload.range;
+                }
+                const startInput = document.getElementById('bt-start-date');
+                const endInput = document.getElementById('bt-end-date');
+                if (startInput && typeof payload.startDate === 'string') startInput.value = payload.startDate;
+                if (endInput && typeof payload.endDate === 'string') endInput.value = payload.endDate;
+                const capInput = document.getElementById('bt-capital-input');
+                if (capInput && typeof payload.capital === 'string' && payload.capital !== '') capInput.value = payload.capital;
+            } catch (_) {}
+        }
 
         searchInput.addEventListener('input', (e) => {
             const val = e.target.value.trim();
+            persistConsoleState();
             if (val.length < 1) {
                 resultsBox.classList.add('hidden');
                 return;
@@ -1244,6 +1285,7 @@
 
         function selectStock(stock) {
             searchInput.value = stock.code;
+            persistConsoleState();
             resultsBox.classList.add('hidden');
             if (liveEnabled && liveRunning) restartSimulation(stock.code);
         }
@@ -2085,10 +2127,10 @@
                 backtestStatusMonitorTimer = null;
             }
             if (state === BACKTEST_BTN_STATE.running) {
-                btn.className = 'bg-amber-600 hover:bg-amber-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-amber-500 min-w-[128px] cursor-not-allowed';
-                btn.disabled = true;
-                icon.className = 'fa-solid fa-spinner fa-spin';
-                label.innerText = '回测中';
+                btn.className = 'bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-rose-500 min-w-[128px]';
+                btn.disabled = false;
+                icon.className = 'fa-solid fa-stop';
+                label.innerText = '终止回测';
                 backtestMonitorErrorCount = 0;
                 monitorBacktestTaskStatus();
                 return;
@@ -2118,6 +2160,11 @@
                     setBacktestButtonState(BACKTEST_BTN_STATE.error);
                     return;
                 }
+                if (reportStatus === 'cancelled') {
+                    logMessage('回测', '回测已终止', 'warning');
+                    setBacktestButtonState(BACKTEST_BTN_STATE.idle);
+                    return;
+                }
                 if (reportStatus === 'success') {
                     setBacktestButtonState(BACKTEST_BTN_STATE.idle);
                     return;
@@ -2134,8 +2181,26 @@
             backtestStatusMonitorTimer = setTimeout(monitorBacktestTaskStatus, 2000);
         }
 
+        async function stopBacktest() {
+            try {
+                const res = await fetch('/api/control/stop', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    logMessage('回测', '已发送终止请求', 'warning');
+                } else {
+                    logMessage('回测', data.msg || '当前没有运行中的回测任务', 'warning');
+                }
+            } catch (e) {
+                logMessage('回测', `终止失败: ${e}`, 'danger');
+                setBacktestButtonState(BACKTEST_BTN_STATE.error);
+            }
+        }
+
         function startBacktest() {
-            if (backtestBtnState === BACKTEST_BTN_STATE.running) return;
+            if (backtestBtnState === BACKTEST_BTN_STATE.running) {
+                stopBacktest();
+                return;
+            }
             const overlay = document.getElementById('backtest-overlay');
             if (overlay) overlay.classList.remove('active');
             strategyReportsBuffer = [];
@@ -2217,6 +2282,7 @@
                 custom.classList.add('hidden');
                 custom.classList.remove('flex');
             }
+            persistConsoleState();
         }
         
         function updateBacktestProgress(data) {
@@ -2521,10 +2587,16 @@
         
         // Initial Log
         logMessage('SYSTEM', '控制台就绪，等待连接...', 'info');
+        restoreConsoleState();
+        onBacktestRangeChange(document.getElementById('bt-range-select')?.value || '1y');
+        searchInput.addEventListener('change', persistConsoleState);
+        document.getElementById('bt-start-date')?.addEventListener('change', persistConsoleState);
+        document.getElementById('bt-end-date')?.addEventListener('change', persistConsoleState);
+        document.getElementById('bt-capital-input')?.addEventListener('input', persistConsoleState);
         fetchGlobalStrategies();
         renderLiveStatus();
         updateConfidenceScore();
-        onBacktestRangeChange(document.getElementById('bt-range-select')?.value || '1y');
+        persistConsoleState();
 
     </script>
 </body>

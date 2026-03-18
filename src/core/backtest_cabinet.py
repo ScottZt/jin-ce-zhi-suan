@@ -57,6 +57,10 @@ class BacktestCabinet:
             self.strategies = [s for s in all_strategies if s.id == self.strategy_id]
             
         self.secretariat = ZhongshuSheng(self.strategies)
+        strategy_count = max(1, len(self.strategies))
+        self.strategy_initial_capital = self.initial_capital / strategy_count
+        self.strategy_revenues = {s.id: HuBuRevenue(self.strategy_initial_capital) for s in self.strategies}
+        self.aggregate_nav = []
         
         for s in self.strategies:
             self.personnel.register_strategy(s)
@@ -66,23 +70,31 @@ class BacktestCabinet:
             await self.event_callback(event_type, data)
 
     async def _emit_account_snapshot(self, kline, active_strategy_id=None, compliance_status="PASS"):
-        holdings_value = self.state_affairs.update_holdings_value({kline['code']: kline['close']})
-        fund_value = self.revenue.cash + holdings_value
+        current_prices = {kline['code']: kline['close']}
+        holdings_value = 0.0
+        cash_total = 0.0
+        for sid, account in self.strategy_revenues.items():
+            strategy_holdings = self.state_affairs.update_strategy_holdings_value(sid, current_prices)
+            account.update_daily_nav(kline['dt'], strategy_holdings)
+            holdings_value += strategy_holdings
+            cash_total += float(account.cash)
+        fund_value = cash_total + holdings_value
         pnl_pct = ((fund_value / self.initial_capital) - 1.0) * 100 if self.initial_capital else 0.0
         pos_ratio = (holdings_value / fund_value * 100) if fund_value > 0 else 0.0
         await self._emit('account', {
             'assets': round(fund_value, 2),
-            'cash': round(self.revenue.cash, 2),
+            'cash': round(cash_total, 2),
             'pnl': f"{pnl_pct:+.2f}%",
             'pos_ratio': f"{pos_ratio:.2f}%"
         })
+        self.aggregate_nav.append({'dt': kline['dt'], 'nav': fund_value})
         current_dd = 0.0
-        if self.revenue.daily_nav:
-            nav_series = [x.get('nav', 0.0) for x in self.revenue.daily_nav]
+        if self.aggregate_nav:
+            nav_series = [x.get('nav', 0.0) for x in self.aggregate_nav]
             peak = max(nav_series) if nav_series else fund_value
             current_dd = ((peak - fund_value) / peak * 100) if peak > 0 else 0.0
         await self._emit('ministry_tick', {
-            'cash': round(self.revenue.cash, 2),
+            'cash': round(cash_total, 2),
             'available_pos_pct': max(0.0, 100.0 - pos_ratio),
             'main_strategy': active_strategy_id,
             'drawdown_pct': round(current_dd, 2),
@@ -205,13 +217,18 @@ class BacktestCabinet:
                         runnable_strategy_ids.append(sid)
 
             # Generate Signals
+            strategy_context = {
+                sid: {
+                    "current_cash": float(self.strategy_revenues[sid].cash),
+                    "last_price": float(kline.get("close", 0.0))
+                }
+                for sid in runnable_strategy_ids
+                if sid in self.strategy_revenues
+            }
             signals = self.secretariat.generate_signals(
                 kline,
                 runnable_strategy_ids=runnable_strategy_ids,
-                strategy_context={
-                    "current_cash": float(self.revenue.cash),
-                    "last_price": float(kline.get("close", 0.0))
-                }
+                strategy_context={"__by_strategy__": strategy_context}
             )
             if signals:
                 await self._emit('backtest_flow', {
@@ -230,7 +247,10 @@ class BacktestCabinet:
                 
                 # Check Risk
                 # Approx fund value for backtest speed
-                current_fund_value = self.revenue.cash + self.state_affairs.update_holdings_value({kline['code']: kline['close']})
+                account = self.strategy_revenues.get(sid)
+                if account is None:
+                    continue
+                current_fund_value = float(account.cash) + self.state_affairs.update_strategy_holdings_value(sid, {kline['code']: kline['close']})
                 current_positions = self.state_affairs.positions.get(sid, {})
                 
                 approved, reason = self.chancellery.check_signal(signal, current_fund_value, current_positions, 0.0)
@@ -254,7 +274,7 @@ class BacktestCabinet:
                         'details': f"> 策略: {sid}<br>> 动作: {signal['direction']}<br>> 数量: {signal['qty']}",
                         'status': 'bg-trading-yellow'
                     })
-                    executed = self.state_affairs.execute_order(sid, signal, kline)
+                    executed = self.state_affairs.execute_order(sid, signal, kline, hu_bu_account=account)
                     if executed:
                         new_qty = self.state_affairs.positions[sid][signal['code']]['qty'] if signal['code'] in self.state_affairs.positions.get(sid, {}) else 0
                         self.secretariat.update_strategy_state(sid, signal['code'], new_qty)
@@ -280,7 +300,12 @@ class BacktestCabinet:
             # Check Stops
             triggered_orders = self.state_affairs.check_stops(kline)
             for order in triggered_orders:
-                self.state_affairs.execute_order(order['strategy_id'], order, kline)
+                account = self.strategy_revenues.get(order['strategy_id'])
+                if account is None:
+                    continue
+                executed = self.state_affairs.execute_order(order['strategy_id'], order, kline, hu_bu_account=account)
+                if not executed:
+                    continue
                 self.secretariat.update_strategy_state(order['strategy_id'], order['code'], 0)
                 await self._emit('backtest_flow', {
                             'module': '兵部',
@@ -303,13 +328,23 @@ class BacktestCabinet:
         
         reports = []
         for s in self.strategies:
-            report = self.rites.generate_report(s.id, self.revenue, self.justice, self.initial_capital/len(self.strategies))
+            account = self.strategy_revenues.get(s.id)
+            if account is None:
+                continue
+            report = self.rites.generate_report(
+                s.id,
+                account,
+                self.justice,
+                self.strategy_initial_capital,
+                start_date=start_date,
+                end_date=end_date
+            )
             reports.append(report)
-            strategy_transactions = [t for t in self.revenue.transactions if t.get('strategy_id') == s.id]
+            strategy_transactions = list(account.transactions)
             formatted = self.rites.generate_backtest_report(
                 strategy_id=s.id,
                 transactions=strategy_transactions,
-                initial_capital=self.initial_capital / len(self.strategies),
+                initial_capital=self.strategy_initial_capital,
                 start_date=start_date,
                 end_date=end_date
             )

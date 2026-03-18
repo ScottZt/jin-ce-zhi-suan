@@ -152,6 +152,15 @@ def fail_current_backtest_report(msg):
     current_backtest_report["finished_at"] = datetime.now().isoformat(timespec="seconds")
     finalize_current_backtest_report()
 
+def cancel_current_backtest_report(msg="backtest cancelled"):
+    global current_backtest_report
+    if not current_backtest_report:
+        return
+    current_backtest_report["status"] = "cancelled"
+    current_backtest_report["error_msg"] = str(msg)
+    current_backtest_report["finished_at"] = datetime.now().isoformat(timespec="seconds")
+    finalize_current_backtest_report()
+
 # --- WebSocket Manager ---
 async def connect(websocket: WebSocket):
     await websocket.accept()
@@ -413,7 +422,11 @@ async def api_stop_task():
     global cabinet_task
     if cabinet_task and not cabinet_task.done():
         cabinet_task.cancel()
-        await manager.broadcast({"type": "system", "data": {"msg": "Task stopped via API"}})
+        if current_backtest_report and str(current_backtest_report.get("status", "")).lower() == "running":
+            cancel_current_backtest_report("backtest task cancelled by user")
+            await manager.broadcast({"type": "system", "data": {"msg": "回测已手动终止"}})
+            return {"status": "success", "msg": "Backtest stopped"}
+        await manager.broadcast({"type": "system", "data": {"msg": "内阁监控已手动停止"}})
         return {"status": "success", "msg": "Task stopped"}
     return {"status": "info", "msg": "No task is currently running"}
 
@@ -590,6 +603,14 @@ async def websocket_endpoint(websocket: WebSocket):
                          print("Stopping Cabinet Task...")
                          cabinet_task.cancel()
                          await manager.broadcast({"type": "system", "data": {"msg": "内阁监控已手动停止"}})
+                
+                elif cmd.get("type") == "stop_backtest":
+                    if cabinet_task and not cabinet_task.done():
+                        print("Stopping Backtest Task...")
+                        cabinet_task.cancel()
+                        if current_backtest_report and str(current_backtest_report.get("status", "")).lower() == "running":
+                            cancel_current_backtest_report("backtest task cancelled by user")
+                        await manager.broadcast({"type": "system", "data": {"msg": "回测已手动终止"}})
                     
             except Exception as e:
                 print(f"Command Error: {e}")
@@ -653,7 +674,8 @@ async def run_backtest_task(stock_code, strategy_id, strategy_mode=None, start=N
             fail_current_backtest_report("backtest finished without report summary")
     except asyncio.CancelledError:
         print("Backtest Task Cancelled")
-        fail_current_backtest_report("backtest task cancelled")
+        if current_backtest_report and str(current_backtest_report.get("status", "")).lower() == "running":
+            cancel_current_backtest_report("backtest task cancelled")
     except Exception as e:
         logger.error(f"run_backtest_task failed: {e}", exc_info=True)
         fail_current_backtest_report(str(e))
