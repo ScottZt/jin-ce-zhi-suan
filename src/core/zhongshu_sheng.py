@@ -1,5 +1,7 @@
 # src/core/zhongshu_sheng.py
 
+from src.utils.runtime_params import get_value
+
 class ZhongshuSheng:
     """
     中书省 (Secretariat): 为每套策略独立生成买卖信号
@@ -21,11 +23,34 @@ class ZhongshuSheng:
                 strategy.set_backtest_context(**ctx)
             signal = strategy.on_bar(kline)
             if signal:
-                qty = int(signal.get("qty", 0))
+                if "qty" not in signal or signal.get("qty") is None:
+                    signal["qty"] = self._resolve_fallback_qty(strategy)
+                qty = int(float(signal.get("qty", 0)))
                 if qty <= 0:
                     continue
+                signal["qty"] = qty
                 signals.append(signal)
         return signals
+
+    def _resolve_fallback_qty(self, strategy):
+        if hasattr(strategy, "_qty"):
+            try:
+                return int(float(strategy._qty()))
+            except Exception:
+                pass
+        mode = str(get_value("strategy_params.common.order_qty_mode", "fixed")).strip().lower()
+        if mode == "cash_pct":
+            cash = float(getattr(strategy, "current_cash", 0.0) or 0.0)
+            price = float(getattr(strategy, "last_price", 0.0) or 0.0)
+            pct = float(get_value("strategy_params.common.order_cash_pct", 0.1))
+            if pct > 1:
+                pct = pct / 100.0
+            pct = max(0.0, min(1.0, pct))
+            if cash <= 0 or price <= 0 or pct <= 0:
+                return 0
+            raw_qty = int((cash * pct) // price)
+            return int((raw_qty // 100) * 100)
+        return int(float(get_value("strategy_params.common.order_qty", 1000)))
 
     def update_strategy_state(self, strategy_id, code, position_qty):
         """
