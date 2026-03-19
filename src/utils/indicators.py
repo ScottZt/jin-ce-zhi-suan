@@ -93,3 +93,37 @@ class Indicators:
         upper = ma + (std * num_std)
         lower = ma - (std * num_std)
         return upper, ma, lower
+
+    @staticmethod
+    def sma(series, window=14, period=None, **kwargs):
+        w = period if period is not None else window
+        return Indicators.MA(series, int(w))
+
+    @staticmethod
+    def ema(series, window=14, period=None, **kwargs):
+        w = period if period is not None else window
+        return Indicators.EMA(series, int(w))
+
+    @staticmethod
+    def macd(close_series, fast=12, slow=26, signal=9, fastperiod=None, slowperiod=None, signalperiod=None, **kwargs):
+        f = fastperiod if fastperiod is not None else fast
+        s = slowperiod if slowperiod is not None else slow
+        g = signalperiod if signalperiod is not None else signal
+        return Indicators.MACD(close_series, fast=int(f), slow=int(s), signal=int(g))
+
+    @staticmethod
+    def rsi(close_series, window=14, period=None, timeperiod=None, **kwargs):
+        w = period if period is not None else (timeperiod if timeperiod is not None else window)
+        return Indicators.RSI(close_series, window=int(w))
+
+    @staticmethod
+    def kdj(high, low, close, n=9, m1=3, m2=3):
+        return Indicators.KDJ(high, low, close, n=n, m1=m1, m2=m2)
+
+    @staticmethod
+    def atr(high, low, close, window=14):
+        return Indicators.ATR(high, low, close, window=window)
+
+    @staticmethod
+    def bollinger_bands(close, window=20, num_std=2):
+        return Indicators.BollingerBands(close, window=window, num_std=num_std)

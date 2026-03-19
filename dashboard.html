@@ -173,6 +173,12 @@
         .code-font {
             font-family: 'JetBrains Mono', monospace;
         }
+
+        #bt-range-select option,
+        #source-select option {
+            color: #0f172a;
+            background-color: #f8fafc;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col text-sm antialiased selection:bg-trading-blue selection:text-white">
@@ -278,7 +284,7 @@
     <!-- Top Navigation Bar -->
     <header class="h-16 border-b border-slate-700 bg-trading-bg flex items-center justify-between px-6 z-20 shadow-lg">
         <div class="flex items-center gap-4">
-            <div class="text-2xl text-trading-blue animate-pulse"><i class="fa-solid fa-dragon"></i></div>
+            <img src="/logo.png" alt="logo" class="h-10 w-10 object-contain rounded" />
             <div>
                 <h1 class="font-bold text-lg tracking-wide text-white">金策智算 <span class="text-trading-blue text-xs font-mono bg-blue-900/30 px-2 py-0.5 rounded">智能投研决策系统</span></h1>
                 <div class="text-[10px] text-trading-dim font-mono tracking-wider">量化投资 · 智能执行 · 风控协同</div>
@@ -317,22 +323,22 @@
         <div class="flex items-center gap-4">
             <div class="relative">
                 <button id="strategy-multi-btn" onclick="toggleStrategyPanel()" class="bg-slate-800 border border-slate-600 text-white py-1.5 pl-3 pr-9 rounded hover:border-trading-blue focus:outline-none focus:ring-1 focus:ring-trading-blue transition-colors text-xs font-medium min-w-[220px] text-left">
-                    策略：全部策略
+                    策略：未选择
                 </button>
                 <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                     <i class="fa-solid fa-chevron-down text-xs"></i>
                 </div>
                 <div id="strategy-multi-panel" class="hidden absolute top-full mt-2 left-0 z-50 w-[320px] bg-slate-900 border border-slate-700 rounded shadow-2xl p-3">
                     <label class="flex items-center gap-2 text-xs text-white mb-2">
-                        <input id="strategy-all-checkbox" type="checkbox" checked onchange="toggleAllStrategies(this.checked)" />
+                        <input id="strategy-all-checkbox" type="checkbox" onchange="toggleAllStrategies(this.checked)" />
                         <span>全部策略</span>
                     </label>
                     <div id="strategy-multi-list" class="max-h-56 overflow-y-auto space-y-1"></div>
                     <button onclick="applyStrategySelection()" class="mt-3 w-full bg-trading-blue hover:bg-blue-600 text-white py-1.5 rounded text-xs">应用选择</button>
                 </div>
             </div>
-            <button onclick="reloadStrategies()" class="bg-trading-blue hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs transition-all border border-blue-500">
-                <i class="fa-solid fa-rotate"></i> 热更新策略
+            <button onclick="openStrategyManager()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs transition-all border border-indigo-500">
+                <i class="fa-solid fa-chess-knight"></i> 策略管理器
             </button>
             <a href="/report" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs transition-all border border-indigo-500">
                 <i class="fa-solid fa-file-lines"></i> 打开报告
@@ -435,7 +441,7 @@
                         </div>
                         <div class="bg-slate-900/80 p-2 rounded">
                             <div class="text-[10px] text-slate-400">可用仓位</div>
-                            <div class="font-mono text-purple-400" id="personnel-available-pos">45%</div>
+                            <div class="font-mono text-purple-400" id="personnel-available-pos">100.0%</div>
                         </div>
                     </div>
                 </div>
@@ -449,11 +455,12 @@
                     <div class="text-[10px] text-slate-500 mt-1">资金核算 & 盈亏统计</div>
                     <div class="text-[10px] text-slate-500 mt-1">参数: 手续费率 <span id="cfg-hu-commission" class="text-slate-300">--</span>，最低费 <span id="cfg-hu-minc" class="text-slate-300">--</span></div>
                     <div class="mt-2 flex items-baseline gap-2">
-                        <span class="text-2xl font-mono font-bold text-white" id="revenue-cash">452,000</span>
+                        <span class="text-2xl font-mono font-bold text-white" id="revenue-cash">1,000,000</span>
                         <span class="text-xs text-slate-400">可用资金</span>
+                        <span class="text-[10px] text-slate-500 font-mono" id="revenue-cash-ratio">100.0%</span>
                     </div>
                     <div class="w-full bg-slate-700 h-1 rounded-full mt-2 overflow-hidden">
-                        <div class="bg-trading-yellow h-full" style="width: 60%"></div>
+                        <div id="revenue-cash-bar" class="bg-trading-yellow h-full transition-all duration-300" style="width: 100%"></div>
                     </div>
                 </div>
 
@@ -466,8 +473,8 @@
                     <div class="text-[10px] text-slate-500 mt-1">市场情绪 & 交易合规</div>
                     <div class="text-[10px] text-slate-500 mt-1">参数: 实盘开关 <span id="cfg-li-rites-live" class="text-slate-300">--</span></div>
                     <div class="mt-2 font-mono text-sm">
-                        <div>市场温度: <span class="text-trading-red" id="rites-market-temp">🔥 78（偏热）</span></div>
-                        <div>合规检查: <span class="text-trading-green" id="rites-compliance-status">通过</span></div>
+                        <div>市场温度: <span class="text-slate-400" id="rites-market-temp">--</span></div>
+                        <div>合规检查: <span class="text-slate-400" id="rites-compliance-status">--</span></div>
                     </div>
                 </div>
 
@@ -511,9 +518,10 @@
                         </div>
                         <div class="flex justify-between text-xs">
                             <span>当前回撤</span>
-                            <span class="font-mono text-trading-green" id="justice-dd-current">0.45%</span>
+                            <span class="font-mono text-trading-green" id="justice-dd-current">0.00%</span>
                         </div>
                     </div>
+                    <div class="text-[10px] text-slate-500 mt-2">规则：当前回撤 &gt;= 回撤限制为红色，低于回撤限制为绿色</div>
                 </div>
 
                 <!-- Gong Bu (Works) -->
@@ -538,6 +546,7 @@
                             <div class="text-white" id="ind-rsi">--</div>
                         </div>
                     </div>
+                    <div class="text-[10px] text-slate-500 mt-2">K线来源: <span id="ind-source-info" class="text-slate-300">--</span></div>
                 </div>
             </div>
         </section>
@@ -547,34 +556,35 @@
             <div class="flex items-center gap-2 text-trading-dim text-xs font-bold uppercase tracking-widest border-b border-slate-700 pb-2">
                 <i class="fa-solid fa-clock-rotate-left"></i> 系统运行日志 (System Logs)
             </div>
-
-            <div class="glass-panel rounded-lg p-3 border border-slate-700/70">
-                <div class="text-xs uppercase tracking-widest text-slate-400 mb-1">当前策略文字说明</div>
-                <div id="strategy-quick-name" class="text-sm font-bold text-white mb-1">全部策略总览</div>
-                <div id="strategy-quick-logic" class="text-[11px] text-slate-300">多策略协同：并行生成信号，由风控统一审核执行。</div>
-                <div id="strategy-quick-example" class="text-[10px] text-slate-500 mt-1">示例：当07与01同向看多时，信号一致性提升。</div>
-            </div>
-
-            <div id="live-console-panel" class="hidden glass-panel rounded-lg p-3 border border-slate-700/70">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="text-xs uppercase tracking-widest text-slate-400">实盘控制台</div>
-                    <span id="live-run-state" class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-200">待机</span>
+            <div class="flex-1 min-h-0 grid grid-rows-2 gap-4">
+                <div class="glass-panel rounded-lg p-3 border border-slate-700/70 h-full min-h-0 overflow-y-auto">
+                    <div class="text-xs uppercase tracking-widest text-slate-400 mb-1">当前策略文字说明</div>
+                    <div id="strategy-quick-name" class="text-sm font-bold text-white mb-1">全部策略总览</div>
+                    <div id="strategy-quick-logic" class="text-[11px] text-slate-300">多策略协同：并行生成信号，由风控统一审核执行。</div>
+                    <div id="strategy-quick-example" class="text-[10px] text-slate-500 mt-1">示例：当07与01同向看多时，信号一致性提升。</div>
+                    <div id="strategy-quick-details" class="mt-2 space-y-1"></div>
                 </div>
-                <div class="text-[11px] text-slate-300 mb-1">本周期触发周期</div>
-                <div id="live-trigger-summary" class="font-mono text-[11px] text-cyan-300 bg-slate-900/60 border border-slate-700 rounded p-2 mb-2">--</div>
-                <div class="text-[11px] text-slate-300 mb-1">本周期策略列表</div>
-                <div id="live-strategy-summary" class="font-mono text-[11px] text-emerald-300 bg-slate-900/60 border border-slate-700 rounded p-2">--</div>
-                <div class="text-[10px] text-slate-500 mt-2">周期对照：1min=1分钟，5min=5分钟，10min=10分钟，15min=15分钟，30min=30分钟，60min=60分钟，D=日线</div>
-            </div>
-            
-            <div id="live-stream-panel" class="glass-panel flex-1 rounded-lg p-0 overflow-hidden flex flex-col">
-                <div class="p-2 bg-slate-800/50 text-[10px] text-center text-slate-400 border-b border-slate-700">实时指令流</div>
-                <div class="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs" id="imperial-timeline">
-                    <!-- Logs will be injected here -->
-                    <div class="flex gap-2 opacity-50">
-                        <span class="text-slate-500">[09:30:00]</span>
-                        <span class="text-blue-400">系统</span>
-                        <span class="text-slate-300">系统启动...</span>
+                <div class="h-full min-h-0 flex flex-col gap-3">
+                    <div id="live-console-panel" class="hidden glass-panel rounded-lg p-3 border border-slate-700/70">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-xs uppercase tracking-widest text-slate-400">实盘控制台</div>
+                            <span id="live-run-state" class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-200">待机</span>
+                        </div>
+                        <div class="text-[11px] text-slate-300 mb-1">本周期触发周期</div>
+                        <div id="live-trigger-summary" class="font-mono text-[11px] text-cyan-300 bg-slate-900/60 border border-slate-700 rounded p-2 mb-2">--</div>
+                        <div class="text-[11px] text-slate-300 mb-1">本周期策略列表</div>
+                        <div id="live-strategy-summary" class="font-mono text-[11px] text-emerald-300 bg-slate-900/60 border border-slate-700 rounded p-2">--</div>
+                        <div class="text-[10px] text-slate-500 mt-2">周期对照：1min=1分钟，5min=5分钟，10min=10分钟，15min=15分钟，30min=30分钟，60min=60分钟，D=日线</div>
+                    </div>
+                    <div id="live-stream-panel" class="glass-panel flex-1 min-h-0 rounded-lg p-0 overflow-hidden flex flex-col">
+                        <div class="p-2 bg-slate-800/50 text-[10px] text-center text-slate-400 border-b border-slate-700">实时指令流</div>
+                        <div class="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs" id="imperial-timeline">
+                            <div class="flex gap-2 opacity-50">
+                                <span class="text-slate-500">[09:30:00]</span>
+                                <span class="text-blue-400">系统</span>
+                                <span class="text-slate-300">系统启动...</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -650,6 +660,10 @@
                 <i id="live-toggle-icon" class="fa-solid fa-satellite-dish"></i>
                 <span id="live-toggle-label">启动实盘</span>
             </button>
+            <button id="pattern-picker-btn" onclick="openPatternPicker()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-slate-500 min-w-[128px]">
+                <i class="fa-solid fa-table-cells-large"></i>
+                <span>经典形态</span>
+            </button>
             <button id="backtest-trigger-btn" onclick="startBacktest()" class="bg-trading-blue hover:bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm transition-all shadow-[0_0_10px_rgba(59,130,246,0.3)] border border-blue-500 min-w-[128px]">
                 <i id="backtest-trigger-icon" class="fa-solid fa-play"></i>
                 <span id="backtest-trigger-label">立即回测</span>
@@ -657,11 +671,18 @@
             <button onclick="openConfigCenter()" class="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-purple-500">
                 <i class="fa-solid fa-sliders"></i> 配置中心
             </button>
-            <button onclick="openStrategyManager()" class="bg-indigo-700 hover:bg-indigo-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-indigo-500">
-                <i class="fa-solid fa-chess-knight"></i> 策略管理器
-            </button>
         </div>
     </footer>
+    <div id="pattern-picker-modal" class="hidden fixed inset-0 bg-black/70 z-[155] flex items-center justify-center p-5">
+        <div class="w-[1450px] max-w-[98vw] h-[86vh] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl flex flex-col overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                <div class="text-white font-bold"><i class="fa-solid fa-table-cells-large mr-2 text-cyan-300"></i>经典形态快速选择</div>
+                <button onclick="closePatternPicker()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="px-4 py-2 text-xs text-slate-400 border-b border-slate-700">选择一个形态后自动回填股票代码与开始/结束日期（回测区间自动切到自定义）</div>
+            <div id="pattern-picker-grid" class="flex-1 min-h-0 p-4 grid grid-cols-5 grid-rows-2 gap-3 overflow-y-auto"></div>
+        </div>
+    </div>
 
     <div id="config-modal" class="hidden fixed inset-0 bg-black/70 z-[140] flex items-center justify-center p-6">
         <div class="w-[980px] max-w-[96vw] h-[78vh] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl flex flex-col overflow-hidden">
@@ -707,6 +728,7 @@
                                 <th class="px-3 py-2 text-left">策略详情说明</th>
                                 <th class="px-3 py-2 text-left">策略代码</th>
                                 <th class="px-3 py-2 text-left">原始需求</th>
+                                <th class="px-3 py-2 text-left">评分</th>
                                 <th class="px-3 py-2 text-left">状态</th>
                                 <th class="px-3 py-2 text-right">操作</th>
                             </tr>
@@ -1123,6 +1145,20 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             { id: '08', name: '神奇九转' },
             { id: '09', name: '箱体降本策略' }
         ];
+        const CLASSIC_PATTERNS = [
+            { id: 'p1', patternName: '单边大牛市（主升浪）', stockName: '上纬新材', stockCode: '688585', start: '2025-07-09', end: '2025-12-31' },
+            { id: 'p2', patternName: '单边大熊市（主跌浪）', stockName: '仕净科技', stockCode: '301030', start: '2025-01-02', end: '2025-06-30' },
+            { id: 'p3', patternName: '妖股连板脉冲（极端题材牛市）', stockName: '首开股份', stockCode: '600376', start: '2025-07-01', end: '2025-12-31' },
+            { id: 'p4', patternName: '矩形箱体震荡（标准区间震荡）', stockName: '中国中免', stockCode: '601888', start: '2025-01-02', end: '2025-06-30' },
+            { id: 'p5', patternName: '对称三角形整理（变盘形态）', stockName: '先导智能', stockCode: '300450', start: '2025-04-01', end: '2025-09-30' },
+            { id: 'p6', patternName: '上升旗形（上涨中继）', stockName: '剑桥科技', stockCode: '603083', start: '2025-03-03', end: '2025-08-29' },
+            { id: 'p7', patternName: '高位横盘强势整理', stockName: '中国移动', stockCode: '600941', start: '2025-07-01', end: '2025-12-31' },
+            { id: 'p8', patternName: '下降楔形（诱空见底）', stockName: '中国石油', stockCode: '601857', start: '2025-01-02', end: '2025-06-30' },
+            { id: 'p9', patternName: 'W底/双底反转（底部反转）', stockName: '东方日升', stockCode: '300118', start: '2025-06-02', end: '2025-11-28' },
+            { id: 'p10', patternName: 'V型反转（熊转牛）', stockName: '立讯精密', stockCode: '002475', start: '2025-09-01', end: '2025-12-31' }
+        ];
+        let patternPickerRendered = false;
+        let patternKlineCache = {};
         
         function wsUrl() {
             const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -1199,6 +1235,25 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             handleEvent(payload);
         }
 
+        async function loadLatestStrategyScores() {
+            try {
+                const res = await fetch('/api/report/latest');
+                if (!res.ok) return;
+                const data = await res.json();
+                const ranking = data?.summary?.ranking;
+                if (!Array.isArray(ranking) || !ranking.length) return;
+                const map = {};
+                ranking.forEach(row => {
+                    const sid = String(row.strategy_id || '');
+                    const score = Number(row.score_total);
+                    if (sid && Number.isFinite(score)) map[sid] = score;
+                });
+                if (!Object.keys(map).length) return;
+                latestStrategyScores = map;
+                updateStrategyList(strategyCatalog, true);
+            } catch (_) {}
+        }
+
         function connectWebSocket() {
             clearWsTimers();
             try {
@@ -1214,6 +1269,8 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 DIAG_STATE.wsConnected = true;
                 updateDebugPanel();
                 fetchGlobalStrategies();
+                loadLatestStrategyScores();
+                loadStrategyManager();
                 syncStatus();
                 wsHeartbeatTimer = setInterval(() => {
                     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -1321,9 +1378,12 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     pulsePanel('panel-bing');
                     break;
                 case 'account':
+                    let latestAssets = null;
+                    let latestCash = null;
                     if (data.assets !== undefined && data.assets !== null) {
                         const assetNum = Number(data.assets);
                         setMetricText('total-assets', `¥ ${assetNum.toLocaleString()}`, assetNum);
+                        latestAssets = assetNum;
                     }
                     if (data.pnl !== undefined && data.pnl !== null) {
                         const pnlNum = parseMetricNumber(data.pnl) ?? 0;
@@ -1337,11 +1397,13 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     if (data.cash !== undefined) {
                         const cashNum = Number(data.cash);
                         setMetricText('revenue-cash', cashNum.toLocaleString(), cashNum);
+                        latestCash = cashNum;
                     }
                     if (data.pos_ratio) {
                         const availVal = (100 - Number(String(data.pos_ratio).replace('%','') || 0));
                         setMetricText('personnel-available-pos', `${availVal.toFixed(1)}%`, availVal);
                     }
+                    updateRevenueCashRatioBar(latestCash, latestAssets);
                     pulsePanel('panel-hu');
                     break;
                 case 'live_tick':
@@ -1404,6 +1466,12 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 const rsi = Number(data.rsi);
                 setMetricText('ind-rsi', rsi.toFixed(2), rsi);
             }
+            const source = document.getElementById('ind-source-info');
+            if (source) {
+                const tf = String(data.kline_timeframe || '--');
+                const dt = String(data.kline_dt || data.time || '--');
+                source.innerText = `${tf} · ${dt}`;
+            }
         }
 
         function updateStrategyList(strategies, preserveSelection = false) {
@@ -1419,10 +1487,10 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 const ids = new Set(strategyCatalog.map(s => String(s.id)));
                 selectedStrategyIds = prevSelected.filter(id => ids.has(String(id)));
                 if (!selectedStrategyIds.length) {
-                    selectedStrategyIds = strategyCatalog.map(s => String(s.id));
+                    selectedStrategyIds = strategyCatalog.length ? [String(strategyCatalog[0].id)] : [];
                 }
             } else {
-                selectedStrategyIds = strategyCatalog.map(s => String(s.id));
+                selectedStrategyIds = strategyCatalog.length ? [String(strategyCatalog[0].id)] : [];
             }
             const scoreColor = (score) => {
                 const s = Math.max(0, Math.min(100, Number(score || 0)));
@@ -1454,9 +1522,9 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 });
             }
             const allBox = document.getElementById('strategy-all-checkbox');
-            if (allBox) allBox.checked = true;
+            if (allBox) allBox.checked = selectedStrategyIds.length === strategyCatalog.length && strategyCatalog.length > 0;
             renderStrategySelectionSummary();
-            updateStrategyQuick('all');
+            updateStrategyQuick(selectedStrategyIds.length === 1 ? String(selectedStrategyIds[0]) : 'all');
         }
 
         function toggleStrategyPanel() {
@@ -1482,7 +1550,9 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         function renderStrategySelectionSummary() {
             const btn = document.getElementById('strategy-multi-btn');
             if (!btn) return;
-            if (!selectedStrategyIds.length || selectedStrategyIds.length === strategyCatalog.length) {
+            if (!selectedStrategyIds.length) {
+                btn.innerText = '策略：未选择';
+            } else if (selectedStrategyIds.length === strategyCatalog.length) {
                 btn.innerText = '策略：全部策略';
             } else if (selectedStrategyIds.length === 1) {
                 const one = strategyCatalog.find(s => String(s.id) === String(selectedStrategyIds[0]));
@@ -1496,7 +1566,10 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         }
 
         function applyStrategySelection() {
-            const picked = getSelectedStrategiesFromUI();
+            let picked = getSelectedStrategiesFromUI();
+            if (!picked.length && strategyCatalog.length) {
+                picked = [String(strategyCatalog[0].id)];
+            }
             selectedStrategyIds = picked;
             const allBox = document.getElementById('strategy-all-checkbox');
             if (allBox) allBox.checked = picked.length === strategyCatalog.length;
@@ -2016,6 +2089,26 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             el.className = `font-mono font-bold text-lg ${rawPnl >= 0 ? 'text-trading-red' : 'text-trading-green'}`;
         }
 
+        function updateRevenueCashRatioBar(cashVal = null, assetVal = null) {
+            const bar = document.getElementById('revenue-cash-bar');
+            const label = document.getElementById('revenue-cash-ratio');
+            if (!bar && !label) return;
+            const cash = cashVal !== null && cashVal !== undefined
+                ? Number(cashVal)
+                : parseMetricNumber(document.getElementById('revenue-cash')?.dataset?.metricRaw ?? document.getElementById('revenue-cash')?.innerText);
+            const assets = assetVal !== null && assetVal !== undefined
+                ? Number(assetVal)
+                : parseMetricNumber(document.getElementById('total-assets')?.dataset?.metricRaw ?? document.getElementById('total-assets')?.innerText);
+            if (!Number.isFinite(cash) || !Number.isFinite(assets) || assets <= 0) {
+                if (bar) bar.style.width = '0%';
+                if (label) label.innerText = '--';
+                return;
+            }
+            const ratio = Math.max(0, Math.min(100, (cash / assets) * 100));
+            if (bar) bar.style.width = `${ratio.toFixed(1)}%`;
+            if (label) label.innerText = `${ratio.toFixed(1)}%`;
+        }
+
         function fmtPct(v, digits = 2) {
             const n = Number(v);
             if (!Number.isFinite(n)) return '--';
@@ -2337,7 +2430,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             const body = document.getElementById('strategy-manager-list');
             if (!body) return;
             if (!rows.length) {
-                body.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-center text-slate-500">暂无策略</td></tr>';
+                body.innerHTML = '<tr><td colspan="9" class="px-3 py-4 text-center text-slate-500">暂无策略</td></tr>';
                 return;
             }
             const shortText = (txt, limit = 28) => {
@@ -2357,6 +2450,9 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 const detailBtn = `<button onclick="openStrategyDetailModal('${sid}')" class="text-white px-2 py-1 rounded text-[11px] border bg-sky-700 hover:bg-sky-600 border-sky-500">详情</button>`;
                 const sourceLabel = String(r.source_label || (r.source === 'market' ? '行情驱动' : (r.source === 'human' ? '用户输入' : '--')));
                 const rawTitle = String(r.raw_requirement_title || '原始需求');
+                const scoreRaw = r.score_total;
+                const scoreText = (scoreRaw === null || scoreRaw === undefined || !Number.isFinite(Number(scoreRaw))) ? '--' : Number(scoreRaw).toFixed(1);
+                const ratingText = String(r.rating || '').trim();
                 return `
                     <tr class="hover:bg-slate-800/40">
                         <td class="px-3 py-2 text-slate-200 font-mono">${sid}</td>
@@ -2365,6 +2461,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                         <td class="px-3 py-2 text-slate-300">${shortText(r.analysis_text || '')}</td>
                         <td class="px-3 py-2 text-cyan-300 font-mono">${shortText(r.code || '')}</td>
                         <td class="px-3 py-2 text-slate-300"><span class="text-slate-500">${rawTitle}：</span>${shortText(r.raw_requirement || '')}</td>
+                        <td class="px-3 py-2 text-yellow-300 font-mono">${scoreText}${ratingText ? `<span class="ml-1 text-slate-400">${ratingText}</span>` : ''}</td>
                         <td class="px-3 py-2 ${statusCls}">${statusTxt}</td>
                         <td class="px-3 py-2 text-right">
                             <div class="inline-flex gap-1">
@@ -2387,6 +2484,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 if (data.status !== 'success') throw new Error(data.msg || '读取失败');
                 strategyManagerRows = Array.isArray(data.strategies) ? data.strategies : [];
                 renderStrategyManagerList(strategyManagerRows);
+                updateStrategyQuick(selectedStrategyIds.length === 1 ? String(selectedStrategyIds[0]) : 'all');
                 if (status) status.innerText = `共 ${strategyManagerRows.length} 个策略`;
             } catch (e) {
                 if (status) status.innerText = `加载失败: ${e}`;
@@ -2687,24 +2785,6 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             } catch (_) {}
             if (!strategyCatalog.length) {
                 updateStrategyList(STRATEGY_FALLBACK);
-            }
-        }
-
-        function reloadStrategies() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                sendWsCommand({ type: 'reload_strategies' });
-                logMessage('SYSTEM', '发送策略热更新指令...');
-                setTimeout(fetchGlobalStrategies, 300);
-            } else {
-                fetch('/api/control/reload_strategies', { method: 'POST' })
-                    .then(res => res.json())
-                    .then(data => {
-                        logMessage('SYSTEM', data.msg);
-                        if(data.status === 'success') {
-                             fetchGlobalStrategies();
-                        }
-                    })
-                    .catch(err => logMessage('SYSTEM', '策略热更新请求失败', 'danger'));
             }
         }
 
@@ -3117,8 +3197,29 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             }, 600);
         }
 
+        function buildBacktestChartCtxFromForm() {
+            const code = normalizeCode(document.getElementById('stock-search-input')?.value || '600036.SH');
+            const range = document.getElementById('bt-range-select')?.value || '1y';
+            let dates = null;
+            if (range === 'custom') {
+                const s = String(document.getElementById('bt-start-date')?.value || '');
+                const e = String(document.getElementById('bt-end-date')?.value || '');
+                if (s && e && s <= e) dates = { start: s, end: e };
+            } else {
+                dates = getBacktestDateRange(range);
+            }
+            if (!dates || !code) return null;
+            return { stock: code, start: dates.start, end: dates.end };
+        }
+
         function openKlineModal() {
-            if (!currentBacktestChartCtx) return;
+            if (!currentBacktestChartCtx) {
+                currentBacktestChartCtx = buildBacktestChartCtxFromForm();
+            }
+            if (!currentBacktestChartCtx) {
+                logMessage('SYSTEM', '无法打开K线：缺少有效回测区间', 'danger');
+                return;
+            }
             klineModalOpened = true;
             const modal = document.getElementById('kline-modal');
             const title = document.getElementById('kline-modal-title');
@@ -3155,9 +3256,92 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             }
             persistConsoleState();
         }
+
+        function getPatternThumbUrl(item) {
+            const key = `${item.stockCode}|${item.start}|${item.end}`;
+            if (!patternKlineCache[key]) {
+                const q = `stock=${encodeURIComponent(item.stockCode)}&start=${encodeURIComponent(item.start)}&end=${encodeURIComponent(item.end)}`;
+                patternKlineCache[key] = `/api/backtest/kline_thumb?${q}`;
+            }
+            return patternKlineCache[key];
+        }
+
+        function applyPatternSelection(item) {
+            const stockInput = document.getElementById('stock-search-input');
+            const rangeSelect = document.getElementById('bt-range-select');
+            const startInput = document.getElementById('bt-start-date');
+            const endInput = document.getElementById('bt-end-date');
+            if (stockInput) stockInput.value = String(item.stockCode || '');
+            if (rangeSelect) {
+                rangeSelect.value = 'custom';
+                onBacktestRangeChange('custom');
+            }
+            if (startInput) startInput.value = String(item.start || '');
+            if (endInput) endInput.value = String(item.end || '');
+            persistConsoleState();
+            closePatternPicker();
+            logMessage('SYSTEM', `已选择经典形态：${item.patternName}（${item.stockCode} ${item.start}~${item.end}）`, 'system');
+        }
+
+        async function renderPatternPickerGrid() {
+            const wrap = document.getElementById('pattern-picker-grid');
+            if (!wrap) return;
+            wrap.innerHTML = CLASSIC_PATTERNS.map(item => `
+                <label class="bg-slate-800/60 border border-slate-700 rounded p-2 flex flex-col gap-2 cursor-pointer hover:border-cyan-500">
+                    <div class="flex items-center gap-2">
+                        <input type="radio" name="classic-pattern-radio" value="${item.id}" />
+                        <span class="text-[11px] text-slate-300">${item.patternName}</span>
+                    </div>
+                    <img id="pattern-kline-${item.id}" src="${getPatternThumbUrl(item)}" class="w-full h-[110px] object-cover bg-slate-950 border border-slate-700 rounded" alt="${item.patternName}" />
+                    <div class="text-[10px] text-slate-400 leading-4">
+                        <div>形态名称：${item.patternName}</div>
+                        <div>股票名称：${item.stockName}</div>
+                        <div>股票代码：${item.stockCode}</div>
+                        <div>开始日期：${item.start}</div>
+                        <div>结束日期：${item.end}</div>
+                    </div>
+                </label>
+            `).join('');
+            const radios = wrap.querySelectorAll('input[type="radio"][name="classic-pattern-radio"]');
+            radios.forEach(r => {
+                r.addEventListener('change', () => {
+                    if (!r.checked) return;
+                    const item = CLASSIC_PATTERNS.find(x => x.id === r.value);
+                    if (item) applyPatternSelection(item);
+                });
+            });
+            CLASSIC_PATTERNS.forEach(item => {
+                const img = document.getElementById(`pattern-kline-${item.id}`);
+                if (!img) return;
+                img.onerror = () => {
+                    img.alt = '无K线数据';
+                    img.style.objectFit = 'contain';
+                };
+            });
+        }
+
+        function openPatternPicker() {
+            const modal = document.getElementById('pattern-picker-modal');
+            if (modal) modal.classList.remove('hidden');
+            if (!patternPickerRendered) {
+                patternPickerRendered = true;
+                renderPatternPickerGrid();
+            }
+        }
+
+        function closePatternPicker() {
+            const modal = document.getElementById('pattern-picker-modal');
+            if (modal) modal.classList.add('hidden');
+        }
         
         function updateBacktestProgress(data) {
             const { progress, current_date } = data;
+            const klineBtn = document.getElementById('kline-open-btn');
+            if (klineBtn) klineBtn.classList.remove('hidden');
+            if (!currentBacktestChartCtx) {
+                const fallbackCtx = buildBacktestChartCtxFromForm();
+                if (fallbackCtx) currentBacktestChartCtx = fallbackCtx;
+            }
             const bar = document.getElementById('backtest-progress-bar');
             const txt = document.getElementById('backtest-status-text');
             const dt = document.getElementById('backtest-date-display');
@@ -3226,10 +3410,13 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         }
 
         function updateMinistryTick(data) {
+            let latestCash = null;
             if (data.cash !== undefined) {
                 const cashNum = Number(data.cash);
                 setMetricText('revenue-cash', cashNum.toLocaleString(), cashNum);
+                latestCash = cashNum;
             }
+            updateRevenueCashRatioBar(latestCash, null);
             if (data.available_pos_pct !== undefined) {
                 const apNum = Number(data.available_pos_pct);
                 setMetricText('personnel-available-pos', `${apNum.toFixed(1)}%`, apNum);
@@ -3248,14 +3435,22 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 if (dd) {
                     const ddNum = Number(data.drawdown_pct);
                     setMetricText('justice-dd-current', `${ddNum.toFixed(2)}%`, ddNum);
-                    dd.className = Number(data.drawdown_pct) > 2 ? 'font-mono text-trading-red' : 'font-mono text-trading-green';
+                    dd.className = 'font-mono text-trading-green';
                 }
             }
             if (data.compliance_status) {
                 const c = document.getElementById('rites-compliance-status');
                 if (c) {
-                    c.innerText = data.compliance_status === 'PASS' ? '通过' : (data.compliance_status === 'REJECT' ? '驳回' : data.compliance_status);
-                    c.className = data.compliance_status === 'PASS' ? 'text-trading-green' : 'text-trading-red';
+                    if (data.compliance_status === 'PASS') {
+                        c.innerText = '通过';
+                        c.className = 'text-trading-green';
+                    } else if (data.compliance_status === 'REJECT') {
+                        c.innerText = '驳回';
+                        c.className = 'text-trading-red';
+                    } else {
+                        c.innerText = '--';
+                        c.className = 'text-slate-400';
+                    }
                 }
             }
         }
@@ -3318,10 +3513,50 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         }
 
         function updateStrategyQuick(strategyId) {
-            const d = STRATEGY_GUIDE[strategyId] || STRATEGY_GUIDE.all;
+            const sid = String(strategyId || '');
             const name = document.getElementById('strategy-quick-name');
             const logic = document.getElementById('strategy-quick-logic');
             const example = document.getElementById('strategy-quick-example');
+            const details = document.getElementById('strategy-quick-details');
+            const selected = selectedStrategyIds.length ? selectedStrategyIds.slice() : (sid && sid !== 'all' ? [sid] : []);
+            const selectedRows = selected
+                .map(id => strategyManagerRows.find(x => String(x.id || '') === String(id)))
+                .filter(x => !!x);
+            if (selected.length > 1 && selectedRows.length) {
+                const sources = new Set(selectedRows.map(x => String(x.source_label || '--')));
+                if (name) name.innerText = `已选 ${selected.length} 个策略`;
+                if (logic) logic.innerText = `聚合摘要：来源 ${Array.from(sources).join(' / ')}；优先按策略管理器“策略详情说明”展示。`;
+                if (example) example.innerText = '下方可展开查看每个策略明细（A方案：聚合摘要 + 折叠明细）';
+                if (details) {
+                    details.innerHTML = selectedRows.map(r => {
+                        const rid = String(r.id || '--');
+                        const rname = String(r.name || rid);
+                        const sourceLabel = String(r.source_label || '--');
+                        const requirementTitle = String(r.raw_requirement_title || '原始需求');
+                        const analysisHtml = renderMarkdownReadonly(r.analysis_text || '--');
+                        const requirementHtml = renderMarkdownReadonly(r.raw_requirement || '--');
+                        return `<details class="bg-slate-900/60 border border-slate-700 rounded p-2">
+                            <summary class="cursor-pointer text-[11px] text-slate-200 font-semibold">[${rid}] ${rname} · ${sourceLabel}</summary>
+                            <div class="mt-2 text-[11px] text-slate-200">
+                                <div class="text-slate-400 mb-1">策略详情说明</div>
+                                <div class="bg-slate-950 border border-slate-700 rounded p-2">${analysisHtml}</div>
+                                <div class="text-slate-400 mt-2 mb-1">${requirementTitle}</div>
+                                <div class="bg-slate-950 border border-slate-700 rounded p-2">${requirementHtml}</div>
+                            </div>
+                        </details>`;
+                    }).join('');
+                }
+                return;
+            }
+            if (details) details.innerHTML = '';
+            const fromManager = strategyManagerRows.find(x => String(x.id || '') === sid);
+            const d = STRATEGY_GUIDE[sid] || STRATEGY_GUIDE.all;
+            if (fromManager) {
+                if (name) name.innerText = `[${sid}] ${fromManager.name || d.name}`;
+                if (logic) logic.innerText = String(fromManager.analysis_text || '--');
+                if (example) example.innerText = `需求：${String(fromManager.raw_requirement_title || '原始需求')} · ${String(fromManager.raw_requirement || '--')}`;
+                return;
+            }
             if (name) name.innerText = d.name;
             if (logic) logic.innerText = `入场：${(d.entry_rules && d.entry_rules[0]) || '无'} 离场：${(d.exit_rules && d.exit_rules[0]) || '无'}`;
             if (example) example.innerText = d.example || '';
@@ -3548,6 +3783,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         fetchGlobalStrategies();
         renderLiveStatus();
         updateConfidenceScore();
+        updateRevenueCashRatioBar();
         persistConsoleState();
 
     </script>

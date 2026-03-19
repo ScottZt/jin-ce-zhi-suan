@@ -18,6 +18,7 @@ from src.utils.data_provider import DataProvider
 import asyncio
 from src.utils.tushare_provider import TushareProvider
 from src.utils.akshare_provider import AkshareProvider
+from src.utils.indicators import Indicators
 
 class LiveCabinet:
     def __init__(self, stock_code, initial_capital=1000000.0, provider_type='default', tushare_token=None, event_callback=None):
@@ -268,17 +269,36 @@ class LiveCabinet:
         if "amount" not in bar and "turnover" in bar:
             bar["amount"] = bar["turnover"]
 
+        self.daily_data_buffer.append(bar)
+        hist_df = pd.DataFrame(self.daily_data_buffer)
+        close_series = pd.to_numeric(hist_df.get("close"), errors="coerce").ffill().bfill()
+        ma5 = float(Indicators.MA(close_series, 5).fillna(close_series).iloc[-1]) if len(close_series) else float(bar["close"])
+        _, _, macd_series = Indicators.MACD(close_series) if len(close_series) else (None, None, pd.Series([0.0]))
+        rsi_series = Indicators.RSI(close_series) if len(close_series) else pd.Series([50.0])
+        macd_val = float(pd.Series(macd_series).fillna(0.0).iloc[-1]) if len(close_series) else 0.0
+        rsi_val = float(pd.Series(rsi_series).fillna(50.0).iloc[-1]) if len(close_series) else 50.0
+
         # Emit Market Data Event
         await self._emit_event('market', {
             'price': f"{bar['close']:.2f}",
-            'ma5': f"{bar['close'] * 0.99:.2f}", # Placeholder
-            'time': current_dt.strftime("%H:%M:%S")
+            'ma5': f"{ma5:.2f}",
+            'macd': float(macd_val),
+            'rsi': float(rsi_val),
+            'time': current_dt.strftime("%H:%M:%S"),
+            'kline_timeframe': '1分钟线',
+            'kline_dt': str(current_dt)
         })
-        
+        holdings_value_now = self.state_affairs.update_holdings_value({bar['code']: bar['close']})
+        fund_value_now = float(self.revenue.cash) + float(holdings_value_now)
+        pos_ratio_now = (holdings_value_now / fund_value_now * 100.0) if fund_value_now > 0 else 0.0
+        await self._emit_event('account', {
+            'assets': round(fund_value_now, 2),
+            'cash': round(float(self.revenue.cash), 2),
+            'pnl': "0.00%",
+            'pos_ratio': f"{pos_ratio_now:.2f}%"
+        })
+
         print(f"\n🆕 新K线生成: {current_dt} | Close: {bar['close']:.2f}")
-        
-        # Buffer Data
-        self.daily_data_buffer.append(bar)
         
         # Check Archive
         self._check_market_close(current_dt)

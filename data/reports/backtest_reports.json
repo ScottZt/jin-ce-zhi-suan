@@ -1,6 +1,1365 @@
 {
   "reports": [
     {
+      "report_id": "1773887297149-4f6a",
+      "created_at": "2026-03-19T10:28:17",
+      "stock_code": "002475.SZ",
+      "strategy_id": "all",
+      "status": "cancelled",
+      "error_msg": "backtest task cancelled by user",
+      "request": {
+        "stock_code": "002475.SZ",
+        "strategy_id": "all",
+        "strategy_ids": null,
+        "strategy_mode": null,
+        "start": "2025-09-01",
+        "end": "2025-12-31",
+        "capital": 1000000
+      },
+      "summary": null,
+      "ranking": [],
+      "strategy_reports": {},
+      "finished_at": "2026-03-19T10:30:47"
+    },
+    {
+      "report_id": "1773886863709-b60e",
+      "created_at": "2026-03-19T10:21:03",
+      "stock_code": "002475.SZ",
+      "strategy_id": "all",
+      "status": "cancelled",
+      "error_msg": "backtest task cancelled by user",
+      "request": {
+        "stock_code": "002475.SZ",
+        "strategy_id": "all",
+        "strategy_ids": null,
+        "strategy_mode": null,
+        "start": "2025-09-01",
+        "end": "2025-12-31",
+        "capital": 1000000
+      },
+      "summary": null,
+      "ranking": [],
+      "strategy_reports": {},
+      "finished_at": "2026-03-19T10:25:24"
+    },
+    {
+      "report_id": "1773884245091-4c5c",
+      "created_at": "2026-03-19T09:37:25",
+      "stock_code": "688585.SH",
+      "strategy_id": "12",
+      "status": "success",
+      "error_msg": null,
+      "request": {
+        "stock_code": "688585.SH",
+        "strategy_id": "12",
+        "strategy_ids": [
+          "12"
+        ],
+        "strategy_mode": null,
+        "start": "2025-07-09",
+        "end": "2025-12-31",
+        "capital": 1000000
+      },
+      "summary": {
+        "stock": "688585.SH",
+        "period": "2025-07-09 - 2025-12-31",
+        "ranking": [
+          {
+            "strategy_id": "12",
+            "total_pnl": 0.0,
+            "roi": 0.0,
+            "annualized_roi": 0.0,
+            "max_dd": 0.0,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "total_trades": 0,
+            "rejections": 0,
+            "violations": 0,
+            "circuit_breaks": 0,
+            "calmar": 0.0,
+            "sharpe": 0.0,
+            "final_capital": 1000000.0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "max_win_streak": 0,
+            "max_loss_streak": 0,
+            "monthly_profit_ratio": 0.0,
+            "annualized_trades": 0.0,
+            "avg_trade_amount_ratio": 0.0,
+            "monthly_stability_ratio": 0.0,
+            "regime_consistency_ratio": 0.0,
+            "positive_day_ratio": 0.0,
+            "scorecard": {
+              "total_score": 32.0,
+              "grade": "C",
+              "conclusion": "放弃或重构",
+              "dimensions": {
+                "profitability": {
+                  "name": "收益能力",
+                  "score": 1.0,
+                  "max_score": 30
+                },
+                "risk_control": {
+                  "name": "风险控制",
+                  "score": 17.0,
+                  "max_score": 35
+                },
+                "pnl_quality": {
+                  "name": "盈亏质量",
+                  "score": 7.0,
+                  "max_score": 20
+                },
+                "practicality": {
+                  "name": "实战可行性",
+                  "score": 7.0,
+                  "max_score": 15
+                }
+              },
+              "metrics": {
+                "annualized_roi": 0.0,
+                "total_return": 0.0,
+                "win_rate": 0.0,
+                "max_drawdown": 0.0,
+                "sharpe": 0.0,
+                "calmar": 0.0,
+                "profit_loss_ratio": 0.0,
+                "max_loss_streak": 0,
+                "monthly_profit_ratio": 0.0,
+                "annualized_trades": 0.0,
+                "avg_trade_amount_ratio": 0.0,
+                "monthly_stability_ratio": 0.0,
+                "regime_consistency_ratio": 0.0
+              }
+            },
+            "score_total": 32.0,
+            "rating": "C",
+            "rank": 1
+          }
+        ],
+        "total_trades": 0,
+        "perf_ms": {
+          "data_fetch": 19431,
+          "period_build": 17475,
+          "main_loop": 86641,
+          "settlement": 12,
+          "total": 123572
+        }
+      },
+      "ranking": [
+        {
+          "strategy_id": "12",
+          "total_pnl": 0.0,
+          "roi": 0.0,
+          "annualized_roi": 0.0,
+          "max_dd": 0.0,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "total_trades": 0,
+          "rejections": 0,
+          "violations": 0,
+          "circuit_breaks": 0,
+          "calmar": 0.0,
+          "sharpe": 0.0,
+          "final_capital": 1000000.0,
+          "avg_win": 0.0,
+          "avg_loss": 0.0,
+          "max_win_streak": 0,
+          "max_loss_streak": 0,
+          "monthly_profit_ratio": 0.0,
+          "annualized_trades": 0.0,
+          "avg_trade_amount_ratio": 0.0,
+          "monthly_stability_ratio": 0.0,
+          "regime_consistency_ratio": 0.0,
+          "positive_day_ratio": 0.0,
+          "scorecard": {
+            "total_score": 32.0,
+            "grade": "C",
+            "conclusion": "放弃或重构",
+            "dimensions": {
+              "profitability": {
+                "name": "收益能力",
+                "score": 1.0,
+                "max_score": 30
+              },
+              "risk_control": {
+                "name": "风险控制",
+                "score": 17.0,
+                "max_score": 35
+              },
+              "pnl_quality": {
+                "name": "盈亏质量",
+                "score": 7.0,
+                "max_score": 20
+              },
+              "practicality": {
+                "name": "实战可行性",
+                "score": 7.0,
+                "max_score": 15
+              }
+            },
+            "metrics": {
+              "annualized_roi": 0.0,
+              "total_return": 0.0,
+              "win_rate": 0.0,
+              "max_drawdown": 0.0,
+              "sharpe": 0.0,
+              "calmar": 0.0,
+              "profit_loss_ratio": 0.0,
+              "max_loss_streak": 0,
+              "monthly_profit_ratio": 0.0,
+              "annualized_trades": 0.0,
+              "avg_trade_amount_ratio": 0.0,
+              "monthly_stability_ratio": 0.0,
+              "regime_consistency_ratio": 0.0
+            }
+          },
+          "score_total": 32.0,
+          "rating": "C",
+          "rank": 1
+        }
+      ],
+      "strategy_reports": {
+        "12": {
+          "strategy_id": "12",
+          "start_date": "2025-07-09",
+          "end_date": "2025-12-31",
+          "init_capital": 1000000.0,
+          "end_capital": 1000000.0,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "trade_count": 0,
+          "win_num": 0,
+          "loss_num": 0,
+          "win_rate": 0.0,
+          "avg_win": 0.0,
+          "avg_loss": 0.0,
+          "profit_ratio": 0.0,
+          "max_win_streak": 0,
+          "max_loss_streak": 0,
+          "monthly_profit_ratio": 0.0,
+          "scorecard": {
+            "total_score": 32.0,
+            "grade": "C",
+            "conclusion": "放弃或重构",
+            "dimensions": {
+              "profitability": {
+                "name": "收益能力",
+                "score": 1.0,
+                "max_score": 30
+              },
+              "risk_control": {
+                "name": "风险控制",
+                "score": 17.0,
+                "max_score": 35
+              },
+              "pnl_quality": {
+                "name": "盈亏质量",
+                "score": 7.0,
+                "max_score": 20
+              },
+              "practicality": {
+                "name": "实战可行性",
+                "score": 7.0,
+                "max_score": 15
+              }
+            },
+            "metrics": {
+              "annualized_roi": 0.0,
+              "total_return": 0.0,
+              "win_rate": 0.0,
+              "max_drawdown": 0.0,
+              "sharpe": 0.0,
+              "calmar": 0.0,
+              "profit_loss_ratio": 0.0,
+              "max_loss_streak": 0,
+              "monthly_profit_ratio": 0.0,
+              "annualized_trades": 0.0,
+              "avg_trade_amount_ratio": 0.0,
+              "monthly_stability_ratio": 0.0,
+              "regime_consistency_ratio": 0.0
+            }
+          },
+          "trade_details": []
+        }
+      },
+      "finished_at": "2026-03-19T09:39:28"
+    },
+    {
+      "report_id": "1773883994181-72dd",
+      "created_at": "2026-03-19T09:33:14",
+      "stock_code": "301030.SZ",
+      "strategy_id": "12",
+      "status": "success",
+      "error_msg": null,
+      "request": {
+        "stock_code": "301030.SZ",
+        "strategy_id": "12",
+        "strategy_ids": [
+          "12"
+        ],
+        "strategy_mode": null,
+        "start": "2025-01-02",
+        "end": "2025-06-30",
+        "capital": 1000000
+      },
+      "summary": {
+        "stock": "301030.SZ",
+        "period": "2025-01-02 - 2025-06-30",
+        "ranking": [
+          {
+            "strategy_id": "12",
+            "total_pnl": 0.0,
+            "roi": 0.0,
+            "annualized_roi": 0.0,
+            "max_dd": 0.0,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "total_trades": 0,
+            "rejections": 0,
+            "violations": 0,
+            "circuit_breaks": 0,
+            "calmar": 0.0,
+            "sharpe": 0.0,
+            "final_capital": 1000000.0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "max_win_streak": 0,
+            "max_loss_streak": 0,
+            "monthly_profit_ratio": 0.0,
+            "annualized_trades": 0.0,
+            "avg_trade_amount_ratio": 0.0,
+            "monthly_stability_ratio": 0.0,
+            "regime_consistency_ratio": 0.0,
+            "positive_day_ratio": 0.0,
+            "scorecard": {
+              "total_score": 32.0,
+              "grade": "C",
+              "conclusion": "放弃或重构",
+              "dimensions": {
+                "profitability": {
+                  "name": "收益能力",
+                  "score": 1.0,
+                  "max_score": 30
+                },
+                "risk_control": {
+                  "name": "风险控制",
+                  "score": 17.0,
+                  "max_score": 35
+                },
+                "pnl_quality": {
+                  "name": "盈亏质量",
+                  "score": 7.0,
+                  "max_score": 20
+                },
+                "practicality": {
+                  "name": "实战可行性",
+                  "score": 7.0,
+                  "max_score": 15
+                }
+              },
+              "metrics": {
+                "annualized_roi": 0.0,
+                "total_return": 0.0,
+                "win_rate": 0.0,
+                "max_drawdown": 0.0,
+                "sharpe": 0.0,
+                "calmar": 0.0,
+                "profit_loss_ratio": 0.0,
+                "max_loss_streak": 0,
+                "monthly_profit_ratio": 0.0,
+                "annualized_trades": 0.0,
+                "avg_trade_amount_ratio": 0.0,
+                "monthly_stability_ratio": 0.0,
+                "regime_consistency_ratio": 0.0
+              }
+            },
+            "score_total": 32.0,
+            "rating": "C",
+            "rank": 1
+          }
+        ],
+        "total_trades": 0,
+        "perf_ms": {
+          "data_fetch": 13035,
+          "period_build": 10763,
+          "main_loop": 73588,
+          "settlement": 20,
+          "total": 97422
+        }
+      },
+      "ranking": [
+        {
+          "strategy_id": "12",
+          "total_pnl": 0.0,
+          "roi": 0.0,
+          "annualized_roi": 0.0,
+          "max_dd": 0.0,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "total_trades": 0,
+          "rejections": 0,
+          "violations": 0,
+          "circuit_breaks": 0,
+          "calmar": 0.0,
+          "sharpe": 0.0,
+          "final_capital": 1000000.0,
+          "avg_win": 0.0,
+          "avg_loss": 0.0,
+          "max_win_streak": 0,
+          "max_loss_streak": 0,
+          "monthly_profit_ratio": 0.0,
+          "annualized_trades": 0.0,
+          "avg_trade_amount_ratio": 0.0,
+          "monthly_stability_ratio": 0.0,
+          "regime_consistency_ratio": 0.0,
+          "positive_day_ratio": 0.0,
+          "scorecard": {
+            "total_score": 32.0,
+            "grade": "C",
+            "conclusion": "放弃或重构",
+            "dimensions": {
+              "profitability": {
+                "name": "收益能力",
+                "score": 1.0,
+                "max_score": 30
+              },
+              "risk_control": {
+                "name": "风险控制",
+                "score": 17.0,
+                "max_score": 35
+              },
+              "pnl_quality": {
+                "name": "盈亏质量",
+                "score": 7.0,
+                "max_score": 20
+              },
+              "practicality": {
+                "name": "实战可行性",
+                "score": 7.0,
+                "max_score": 15
+              }
+            },
+            "metrics": {
+              "annualized_roi": 0.0,
+              "total_return": 0.0,
+              "win_rate": 0.0,
+              "max_drawdown": 0.0,
+              "sharpe": 0.0,
+              "calmar": 0.0,
+              "profit_loss_ratio": 0.0,
+              "max_loss_streak": 0,
+              "monthly_profit_ratio": 0.0,
+              "annualized_trades": 0.0,
+              "avg_trade_amount_ratio": 0.0,
+              "monthly_stability_ratio": 0.0,
+              "regime_consistency_ratio": 0.0
+            }
+          },
+          "score_total": 32.0,
+          "rating": "C",
+          "rank": 1
+        }
+      ],
+      "strategy_reports": {
+        "12": {
+          "strategy_id": "12",
+          "start_date": "2025-01-02",
+          "end_date": "2025-06-30",
+          "init_capital": 1000000.0,
+          "end_capital": 1000000.0,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "trade_count": 0,
+          "win_num": 0,
+          "loss_num": 0,
+          "win_rate": 0.0,
+          "avg_win": 0.0,
+          "avg_loss": 0.0,
+          "profit_ratio": 0.0,
+          "max_win_streak": 0,
+          "max_loss_streak": 0,
+          "monthly_profit_ratio": 0.0,
+          "scorecard": {
+            "total_score": 32.0,
+            "grade": "C",
+            "conclusion": "放弃或重构",
+            "dimensions": {
+              "profitability": {
+                "name": "收益能力",
+                "score": 1.0,
+                "max_score": 30
+              },
+              "risk_control": {
+                "name": "风险控制",
+                "score": 17.0,
+                "max_score": 35
+              },
+              "pnl_quality": {
+                "name": "盈亏质量",
+                "score": 7.0,
+                "max_score": 20
+              },
+              "practicality": {
+                "name": "实战可行性",
+                "score": 7.0,
+                "max_score": 15
+              }
+            },
+            "metrics": {
+              "annualized_roi": 0.0,
+              "total_return": 0.0,
+              "win_rate": 0.0,
+              "max_drawdown": 0.0,
+              "sharpe": 0.0,
+              "calmar": 0.0,
+              "profit_loss_ratio": 0.0,
+              "max_loss_streak": 0,
+              "monthly_profit_ratio": 0.0,
+              "annualized_trades": 0.0,
+              "avg_trade_amount_ratio": 0.0,
+              "monthly_stability_ratio": 0.0,
+              "regime_consistency_ratio": 0.0
+            }
+          },
+          "trade_details": []
+        }
+      },
+      "finished_at": "2026-03-19T09:34:51"
+    },
+    {
+      "report_id": "1773883642424-f06c",
+      "created_at": "2026-03-19T09:27:22",
+      "stock_code": "301030.SZ",
+      "strategy_id": "00",
+      "status": "failed",
+      "error_msg": "Indicators.rsi() got an unexpected keyword argument 'period'",
+      "request": {
+        "stock_code": "301030.SZ",
+        "strategy_id": "00",
+        "strategy_ids": [
+          "00",
+          "12"
+        ],
+        "strategy_mode": null,
+        "start": "2025-01-02",
+        "end": "2025-06-30",
+        "capital": 1000000
+      },
+      "summary": null,
+      "ranking": [],
+      "strategy_reports": {},
+      "finished_at": "2026-03-19T09:28:44"
+    },
+    {
+      "report_id": "1773882311659-b27c",
+      "created_at": "2026-03-19T09:05:11",
+      "stock_code": "688585.SH",
+      "strategy_id": "11",
+      "status": "success",
+      "error_msg": null,
+      "request": {
+        "stock_code": "688585.SH",
+        "strategy_id": "11",
+        "strategy_ids": [
+          "11"
+        ],
+        "strategy_mode": null,
+        "start": "2025-07-09",
+        "end": "2025-12-31",
+        "capital": 1000000
+      },
+      "summary": {
+        "stock": "688585.SH",
+        "period": "2025-07-09 - 2025-12-31",
+        "ranking": [
+          {
+            "strategy_id": "11",
+            "total_pnl": 0.0,
+            "roi": 0.0,
+            "annualized_roi": 0.0,
+            "max_dd": 0.0,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "total_trades": 0,
+            "rejections": 0,
+            "violations": 0,
+            "circuit_breaks": 0,
+            "calmar": 0.0,
+            "sharpe": 0.0,
+            "final_capital": 1000000.0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "max_win_streak": 0,
+            "max_loss_streak": 0,
+            "monthly_profit_ratio": 0.0,
+            "annualized_trades": 0.0,
+            "avg_trade_amount_ratio": 0.0,
+            "monthly_stability_ratio": 0.0,
+            "regime_consistency_ratio": 0.0,
+            "positive_day_ratio": 0.0,
+            "scorecard": {
+              "total_score": 32.0,
+              "grade": "C",
+              "conclusion": "放弃或重构",
+              "dimensions": {
+                "profitability": {
+                  "name": "收益能力",
+                  "score": 1.0,
+                  "max_score": 30
+                },
+                "risk_control": {
+                  "name": "风险控制",
+                  "score": 17.0,
+                  "max_score": 35
+                },
+                "pnl_quality": {
+                  "name": "盈亏质量",
+                  "score": 7.0,
+                  "max_score": 20
+                },
+                "practicality": {
+                  "name": "实战可行性",
+                  "score": 7.0,
+                  "max_score": 15
+                }
+              },
+              "metrics": {
+                "annualized_roi": 0.0,
+                "total_return": 0.0,
+                "win_rate": 0.0,
+                "max_drawdown": 0.0,
+                "sharpe": 0.0,
+                "calmar": 0.0,
+                "profit_loss_ratio": 0.0,
+                "max_loss_streak": 0,
+                "monthly_profit_ratio": 0.0,
+                "annualized_trades": 0.0,
+                "avg_trade_amount_ratio": 0.0,
+                "monthly_stability_ratio": 0.0,
+                "regime_consistency_ratio": 0.0
+              }
+            },
+            "score_total": 32.0,
+            "rating": "C",
+            "rank": 1
+          }
+        ],
+        "total_trades": 0,
+        "perf_ms": {
+          "data_fetch": 9314,
+          "period_build": 8691,
+          "main_loop": 86114,
+          "settlement": 13,
+          "total": 104146
+        }
+      },
+      "ranking": [
+        {
+          "strategy_id": "11",
+          "total_pnl": 0.0,
+          "roi": 0.0,
+          "annualized_roi": 0.0,
+          "max_dd": 0.0,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "total_trades": 0,
+          "rejections": 0,
+          "violations": 0,
+          "circuit_breaks": 0,
+          "calmar": 0.0,
+          "sharpe": 0.0,
+          "final_capital": 1000000.0,
+          "avg_win": 0.0,
+          "avg_loss": 0.0,
+          "max_win_streak": 0,
+          "max_loss_streak": 0,
+          "monthly_profit_ratio": 0.0,
+          "annualized_trades": 0.0,
+          "avg_trade_amount_ratio": 0.0,
+          "monthly_stability_ratio": 0.0,
+          "regime_consistency_ratio": 0.0,
+          "positive_day_ratio": 0.0,
+          "scorecard": {
+            "total_score": 32.0,
+            "grade": "C",
+            "conclusion": "放弃或重构",
+            "dimensions": {
+              "profitability": {
+                "name": "收益能力",
+                "score": 1.0,
+                "max_score": 30
+              },
+              "risk_control": {
+                "name": "风险控制",
+                "score": 17.0,
+                "max_score": 35
+              },
+              "pnl_quality": {
+                "name": "盈亏质量",
+                "score": 7.0,
+                "max_score": 20
+              },
+              "practicality": {
+                "name": "实战可行性",
+                "score": 7.0,
+                "max_score": 15
+              }
+            },
+            "metrics": {
+              "annualized_roi": 0.0,
+              "total_return": 0.0,
+              "win_rate": 0.0,
+              "max_drawdown": 0.0,
+              "sharpe": 0.0,
+              "calmar": 0.0,
+              "profit_loss_ratio": 0.0,
+              "max_loss_streak": 0,
+              "monthly_profit_ratio": 0.0,
+              "annualized_trades": 0.0,
+              "avg_trade_amount_ratio": 0.0,
+              "monthly_stability_ratio": 0.0,
+              "regime_consistency_ratio": 0.0
+            }
+          },
+          "score_total": 32.0,
+          "rating": "C",
+          "rank": 1
+        }
+      ],
+      "strategy_reports": {
+        "11": {
+          "strategy_id": "11",
+          "start_date": "2025-07-09",
+          "end_date": "2025-12-31",
+          "init_capital": 1000000.0,
+          "end_capital": 1000000.0,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "trade_count": 0,
+          "win_num": 0,
+          "loss_num": 0,
+          "win_rate": 0.0,
+          "avg_win": 0.0,
+          "avg_loss": 0.0,
+          "profit_ratio": 0.0,
+          "max_win_streak": 0,
+          "max_loss_streak": 0,
+          "monthly_profit_ratio": 0.0,
+          "scorecard": {
+            "total_score": 32.0,
+            "grade": "C",
+            "conclusion": "放弃或重构",
+            "dimensions": {
+              "profitability": {
+                "name": "收益能力",
+                "score": 1.0,
+                "max_score": 30
+              },
+              "risk_control": {
+                "name": "风险控制",
+                "score": 17.0,
+                "max_score": 35
+              },
+              "pnl_quality": {
+                "name": "盈亏质量",
+                "score": 7.0,
+                "max_score": 20
+              },
+              "practicality": {
+                "name": "实战可行性",
+                "score": 7.0,
+                "max_score": 15
+              }
+            },
+            "metrics": {
+              "annualized_roi": 0.0,
+              "total_return": 0.0,
+              "win_rate": 0.0,
+              "max_drawdown": 0.0,
+              "sharpe": 0.0,
+              "calmar": 0.0,
+              "profit_loss_ratio": 0.0,
+              "max_loss_streak": 0,
+              "monthly_profit_ratio": 0.0,
+              "annualized_trades": 0.0,
+              "avg_trade_amount_ratio": 0.0,
+              "monthly_stability_ratio": 0.0,
+              "regime_consistency_ratio": 0.0
+            }
+          },
+          "trade_details": []
+        }
+      },
+      "finished_at": "2026-03-19T09:06:55"
+    },
+    {
+      "report_id": "1773881505859-9a28",
+      "created_at": "2026-03-19T08:51:45",
+      "stock_code": "301227.SZ",
+      "strategy_id": "00",
+      "status": "success",
+      "error_msg": null,
+      "request": {
+        "stock_code": "301227.SZ",
+        "strategy_id": "00",
+        "strategy_ids": [
+          "00",
+          "11"
+        ],
+        "strategy_mode": null,
+        "start": "2025-07-01",
+        "end": "2026-02-01",
+        "capital": 1000000
+      },
+      "summary": {
+        "stock": "301227.SZ",
+        "period": "2025-07-01 - 2026-02-01",
+        "ranking": [
+          {
+            "strategy_id": "00",
+            "total_pnl": 238879.3069368,
+            "roi": 0.4777586138736,
+            "annualized_roi": 0.58048754786059,
+            "max_dd": 0.0,
+            "win_rate": 1.0,
+            "profit_factor": 0.0,
+            "total_trades": 1,
+            "rejections": 0,
+            "violations": 0,
+            "circuit_breaks": 0,
+            "calmar": 0.0,
+            "sharpe": 1.0467827570009338,
+            "final_capital": 738879.3069368,
+            "avg_win": 238879.3069368,
+            "avg_loss": 0.0,
+            "max_win_streak": 1,
+            "max_loss_streak": 0,
+            "monthly_profit_ratio": 1.0,
+            "annualized_trades": 1.172093023255814,
+            "avg_trade_amount_ratio": 1.236863736,
+            "monthly_stability_ratio": 0.14285714285714285,
+            "regime_consistency_ratio": 0.5,
+            "positive_day_ratio": 0.004651162790697674,
+            "scorecard": {
+              "total_score": 66.0,
+              "grade": "B",
+              "conclusion": "继续优化",
+              "dimensions": {
+                "profitability": {
+                  "name": "收益能力",
+                  "score": 30.0,
+                  "max_score": 30
+                },
+                "risk_control": {
+                  "name": "风险控制",
+                  "score": 20.0,
+                  "max_score": 35
+                },
+                "pnl_quality": {
+                  "name": "盈亏质量",
+                  "score": 11.0,
+                  "max_score": 20
+                },
+                "practicality": {
+                  "name": "实战可行性",
+                  "score": 5.0,
+                  "max_score": 15
+                }
+              },
+              "metrics": {
+                "annualized_roi": 0.58048754786059,
+                "total_return": 0.4777586138736,
+                "win_rate": 1.0,
+                "max_drawdown": 0.0,
+                "sharpe": 1.0467827570009338,
+                "calmar": 0.0,
+                "profit_loss_ratio": 0.0,
+                "max_loss_streak": 0,
+                "monthly_profit_ratio": 1.0,
+                "annualized_trades": 1.172093023255814,
+                "avg_trade_amount_ratio": 1.236863736,
+                "monthly_stability_ratio": 0.14285714285714285,
+                "regime_consistency_ratio": 0.5
+              }
+            },
+            "score_total": 66.0,
+            "rating": "B",
+            "rank": 1
+          },
+          {
+            "strategy_id": "11",
+            "total_pnl": 0.0,
+            "roi": 0.0,
+            "annualized_roi": 0.0,
+            "max_dd": 0.0,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "total_trades": 0,
+            "rejections": 0,
+            "violations": 0,
+            "circuit_breaks": 0,
+            "calmar": 0.0,
+            "sharpe": 0.0,
+            "final_capital": 500000.0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "max_win_streak": 0,
+            "max_loss_streak": 0,
+            "monthly_profit_ratio": 0.0,
+            "annualized_trades": 0.0,
+            "avg_trade_amount_ratio": 0.0,
+            "monthly_stability_ratio": 0.0,
+            "regime_consistency_ratio": 0.0,
+            "positive_day_ratio": 0.0,
+            "scorecard": {
+              "total_score": 32.0,
+              "grade": "C",
+              "conclusion": "放弃或重构",
+              "dimensions": {
+                "profitability": {
+                  "name": "收益能力",
+                  "score": 1.0,
+                  "max_score": 30
+                },
+                "risk_control": {
+                  "name": "风险控制",
+                  "score": 17.0,
+                  "max_score": 35
+                },
+                "pnl_quality": {
+                  "name": "盈亏质量",
+                  "score": 7.0,
+                  "max_score": 20
+                },
+                "practicality": {
+                  "name": "实战可行性",
+                  "score": 7.0,
+                  "max_score": 15
+                }
+              },
+              "metrics": {
+                "annualized_roi": 0.0,
+                "total_return": 0.0,
+                "win_rate": 0.0,
+                "max_drawdown": 0.0,
+                "sharpe": 0.0,
+                "calmar": 0.0,
+                "profit_loss_ratio": 0.0,
+                "max_loss_streak": 0,
+                "monthly_profit_ratio": 0.0,
+                "annualized_trades": 0.0,
+                "avg_trade_amount_ratio": 0.0,
+                "monthly_stability_ratio": 0.0,
+                "regime_consistency_ratio": 0.0
+              }
+            },
+            "score_total": 32.0,
+            "rating": "C",
+            "rank": 2
+          }
+        ],
+        "total_trades": 1,
+        "perf_ms": {
+          "data_fetch": 14973,
+          "period_build": 70891,
+          "main_loop": 122751,
+          "settlement": 23,
+          "total": 208655
+        }
+      },
+      "ranking": [
+        {
+          "strategy_id": "00",
+          "total_pnl": 238879.3069368,
+          "roi": 0.4777586138736,
+          "annualized_roi": 0.58048754786059,
+          "max_dd": 0.0,
+          "win_rate": 1.0,
+          "profit_factor": 0.0,
+          "total_trades": 1,
+          "rejections": 0,
+          "violations": 0,
+          "circuit_breaks": 0,
+          "calmar": 0.0,
+          "sharpe": 1.0467827570009338,
+          "final_capital": 738879.3069368,
+          "avg_win": 238879.3069368,
+          "avg_loss": 0.0,
+          "max_win_streak": 1,
+          "max_loss_streak": 0,
+          "monthly_profit_ratio": 1.0,
+          "annualized_trades": 1.172093023255814,
+          "avg_trade_amount_ratio": 1.236863736,
+          "monthly_stability_ratio": 0.14285714285714285,
+          "regime_consistency_ratio": 0.5,
+          "positive_day_ratio": 0.004651162790697674,
+          "scorecard": {
+            "total_score": 66.0,
+            "grade": "B",
+            "conclusion": "继续优化",
+            "dimensions": {
+              "profitability": {
+                "name": "收益能力",
+                "score": 30.0,
+                "max_score": 30
+              },
+              "risk_control": {
+                "name": "风险控制",
+                "score": 20.0,
+                "max_score": 35
+              },
+              "pnl_quality": {
+                "name": "盈亏质量",
+                "score": 11.0,
+                "max_score": 20
+              },
+              "practicality": {
+                "name": "实战可行性",
+                "score": 5.0,
+                "max_score": 15
+              }
+            },
+            "metrics": {
+              "annualized_roi": 0.58048754786059,
+              "total_return": 0.4777586138736,
+              "win_rate": 1.0,
+              "max_drawdown": 0.0,
+              "sharpe": 1.0467827570009338,
+              "calmar": 0.0,
+              "profit_loss_ratio": 0.0,
+              "max_loss_streak": 0,
+              "monthly_profit_ratio": 1.0,
+              "annualized_trades": 1.172093023255814,
+              "avg_trade_amount_ratio": 1.236863736,
+              "monthly_stability_ratio": 0.14285714285714285,
+              "regime_consistency_ratio": 0.5
+            }
+          },
+          "score_total": 66.0,
+          "rating": "B",
+          "rank": 1
+        },
+        {
+          "strategy_id": "11",
+          "total_pnl": 0.0,
+          "roi": 0.0,
+          "annualized_roi": 0.0,
+          "max_dd": 0.0,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "total_trades": 0,
+          "rejections": 0,
+          "violations": 0,
+          "circuit_breaks": 0,
+          "calmar": 0.0,
+          "sharpe": 0.0,
+          "final_capital": 500000.0,
+          "avg_win": 0.0,
+          "avg_loss": 0.0,
+          "max_win_streak": 0,
+          "max_loss_streak": 0,
+          "monthly_profit_ratio": 0.0,
+          "annualized_trades": 0.0,
+          "avg_trade_amount_ratio": 0.0,
+          "monthly_stability_ratio": 0.0,
+          "regime_consistency_ratio": 0.0,
+          "positive_day_ratio": 0.0,
+          "scorecard": {
+            "total_score": 32.0,
+            "grade": "C",
+            "conclusion": "放弃或重构",
+            "dimensions": {
+              "profitability": {
+                "name": "收益能力",
+                "score": 1.0,
+                "max_score": 30
+              },
+              "risk_control": {
+                "name": "风险控制",
+                "score": 17.0,
+                "max_score": 35
+              },
+              "pnl_quality": {
+                "name": "盈亏质量",
+                "score": 7.0,
+                "max_score": 20
+              },
+              "practicality": {
+                "name": "实战可行性",
+                "score": 7.0,
+                "max_score": 15
+              }
+            },
+            "metrics": {
+              "annualized_roi": 0.0,
+              "total_return": 0.0,
+              "win_rate": 0.0,
+              "max_drawdown": 0.0,
+              "sharpe": 0.0,
+              "calmar": 0.0,
+              "profit_loss_ratio": 0.0,
+              "max_loss_streak": 0,
+              "monthly_profit_ratio": 0.0,
+              "annualized_trades": 0.0,
+              "avg_trade_amount_ratio": 0.0,
+              "monthly_stability_ratio": 0.0,
+              "regime_consistency_ratio": 0.0
+            }
+          },
+          "score_total": 32.0,
+          "rating": "C",
+          "rank": 2
+        }
+      ],
+      "strategy_reports": {
+        "00": {
+          "strategy_id": "00",
+          "start_date": "2025-07-01",
+          "end_date": "2026-02-01",
+          "init_capital": 500000.0,
+          "end_capital": 738879.3069368,
+          "total_return": 0.4777586138736001,
+          "annual_return": 0.58048754786059,
+          "max_drawdown": 0.0,
+          "trade_count": 1,
+          "win_num": 1,
+          "loss_num": 0,
+          "win_rate": 1.0,
+          "avg_win": 238879.3069368,
+          "avg_loss": 0.0,
+          "profit_ratio": 0.0,
+          "max_win_streak": 1,
+          "max_loss_streak": 0,
+          "monthly_profit_ratio": 1.0,
+          "scorecard": {
+            "total_score": 66.0,
+            "grade": "B",
+            "conclusion": "继续优化",
+            "dimensions": {
+              "profitability": {
+                "name": "收益能力",
+                "score": 30.0,
+                "max_score": 30
+              },
+              "risk_control": {
+                "name": "风险控制",
+                "score": 20.0,
+                "max_score": 35
+              },
+              "pnl_quality": {
+                "name": "盈亏质量",
+                "score": 11.0,
+                "max_score": 20
+              },
+              "practicality": {
+                "name": "实战可行性",
+                "score": 5.0,
+                "max_score": 15
+              }
+            },
+            "metrics": {
+              "annualized_roi": 0.58048754786059,
+              "total_return": 0.4777586138736,
+              "win_rate": 1.0,
+              "max_drawdown": 0.0,
+              "sharpe": 1.0467827570009338,
+              "calmar": 0.0,
+              "profit_loss_ratio": 0.0,
+              "max_loss_streak": 0,
+              "monthly_profit_ratio": 1.0,
+              "annualized_trades": 1.172093023255814,
+              "avg_trade_amount_ratio": 1.236863736,
+              "monthly_stability_ratio": 0.14285714285714285,
+              "regime_consistency_ratio": 0.5
+            }
+          },
+          "trade_details": [
+            {
+              "dt": "2025-07-01 15:00:00",
+              "direction": "BUY",
+              "price": 23.423399999999997,
+              "quantity": 21300,
+              "amount": 498918.4199999999,
+              "cost": 99.783684,
+              "pnl": 0.0
+            },
+            {
+              "dt": "2026-01-30 15:00:00",
+              "direction": "SELL",
+              "price": 34.64532,
+              "quantity": 21300,
+              "amount": 737945.316,
+              "cost": 147.5890632,
+              "pnl": 238879.3069368
+            }
+          ]
+        },
+        "11": {
+          "strategy_id": "11",
+          "start_date": "2025-07-01",
+          "end_date": "2026-02-01",
+          "init_capital": 500000.0,
+          "end_capital": 500000.0,
+          "total_return": 0.0,
+          "annual_return": 0.0,
+          "max_drawdown": 0.0,
+          "trade_count": 0,
+          "win_num": 0,
+          "loss_num": 0,
+          "win_rate": 0.0,
+          "avg_win": 0.0,
+          "avg_loss": 0.0,
+          "profit_ratio": 0.0,
+          "max_win_streak": 0,
+          "max_loss_streak": 0,
+          "monthly_profit_ratio": 0.0,
+          "scorecard": {
+            "total_score": 32.0,
+            "grade": "C",
+            "conclusion": "放弃或重构",
+            "dimensions": {
+              "profitability": {
+                "name": "收益能力",
+                "score": 1.0,
+                "max_score": 30
+              },
+              "risk_control": {
+                "name": "风险控制",
+                "score": 17.0,
+                "max_score": 35
+              },
+              "pnl_quality": {
+                "name": "盈亏质量",
+                "score": 7.0,
+                "max_score": 20
+              },
+              "practicality": {
+                "name": "实战可行性",
+                "score": 7.0,
+                "max_score": 15
+              }
+            },
+            "metrics": {
+              "annualized_roi": 0.0,
+              "total_return": 0.0,
+              "win_rate": 0.0,
+              "max_drawdown": 0.0,
+              "sharpe": 0.0,
+              "calmar": 0.0,
+              "profit_loss_ratio": 0.0,
+              "max_loss_streak": 0,
+              "monthly_profit_ratio": 0.0,
+              "annualized_trades": 0.0,
+              "avg_trade_amount_ratio": 0.0,
+              "monthly_stability_ratio": 0.0,
+              "regime_consistency_ratio": 0.0
+            }
+          },
+          "trade_details": []
+        }
+      },
+      "finished_at": "2026-03-19T08:55:14"
+    },
+    {
+      "report_id": "1773881389827-abde",
+      "created_at": "2026-03-19T08:49:49",
+      "stock_code": "301227.SZ",
+      "strategy_id": "00",
+      "status": "failed",
+      "error_msg": "type object 'Indicators' has no attribute 'sma'",
+      "request": {
+        "stock_code": "301227.SZ",
+        "strategy_id": "00",
+        "strategy_ids": [
+          "00",
+          "11"
+        ],
+        "strategy_mode": null,
+        "start": "2025-07-01",
+        "end": "2026-02-01",
+        "capital": 1000000
+      },
+      "summary": null,
+      "ranking": [],
+      "strategy_reports": {},
+      "finished_at": "2026-03-19T08:49:49"
+    },
+    {
+      "report_id": "1773881387234-e958",
+      "created_at": "2026-03-19T08:49:47",
+      "stock_code": "301227.SZ",
+      "strategy_id": "00",
+      "status": "failed",
+      "error_msg": "type object 'Indicators' has no attribute 'sma'",
+      "request": {
+        "stock_code": "301227.SZ",
+        "strategy_id": "00",
+        "strategy_ids": [
+          "00",
+          "11"
+        ],
+        "strategy_mode": null,
+        "start": "2025-07-01",
+        "end": "2026-02-01",
+        "capital": 1000000
+      },
+      "summary": null,
+      "ranking": [],
+      "strategy_reports": {},
+      "finished_at": "2026-03-19T08:49:47"
+    },
+    {
+      "report_id": "1773881385526-3db3",
+      "created_at": "2026-03-19T08:49:45",
+      "stock_code": "301227.SZ",
+      "strategy_id": "00",
+      "status": "failed",
+      "error_msg": "type object 'Indicators' has no attribute 'sma'",
+      "request": {
+        "stock_code": "301227.SZ",
+        "strategy_id": "00",
+        "strategy_ids": [
+          "00",
+          "11"
+        ],
+        "strategy_mode": null,
+        "start": "2025-07-01",
+        "end": "2026-02-01",
+        "capital": 1000000
+      },
+      "summary": null,
+      "ranking": [],
+      "strategy_reports": {},
+      "finished_at": "2026-03-19T08:49:45"
+    },
+    {
+      "report_id": "1773881272482-4d2a",
+      "created_at": "2026-03-19T08:47:52",
+      "stock_code": "301227.SZ",
+      "strategy_id": "00",
+      "status": "failed",
+      "error_msg": "type object 'Indicators' has no attribute 'sma'",
+      "request": {
+        "stock_code": "301227.SZ",
+        "strategy_id": "00",
+        "strategy_ids": [
+          "00",
+          "11"
+        ],
+        "strategy_mode": null,
+        "start": "2025-07-01",
+        "end": "2026-02-01",
+        "capital": 1000000
+      },
+      "summary": null,
+      "ranking": [],
+      "strategy_reports": {},
+      "finished_at": "2026-03-19T08:49:09"
+    },
+    {
       "report_id": "1773853051320-fdda",
       "created_at": "2026-03-19T00:57:31",
       "stock_code": "000919.SZ",

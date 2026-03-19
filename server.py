@@ -17,7 +17,7 @@ matplotlib.use("Agg")
 import matplotlib.lines as mlines
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse, Response
+from fastapi.responses import HTMLResponse, StreamingResponse, Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -84,6 +84,19 @@ kline_daily_cache = {}
 report_history = []
 REPORTS_DIR = os.path.join("data", "reports")
 REPORTS_FILE = os.path.join(REPORTS_DIR, "backtest_reports.json")
+PATTERN_THUMB_DIR = os.path.join(REPORTS_DIR, "pattern_thumbs")
+CLASSIC_PATTERN_ITEMS = [
+    {"stock": "688585", "start": "2025-07-09", "end": "2025-12-31"},
+    {"stock": "301030", "start": "2025-01-02", "end": "2025-06-30"},
+    {"stock": "600376", "start": "2025-07-01", "end": "2025-12-31"},
+    {"stock": "601888", "start": "2025-01-02", "end": "2025-06-30"},
+    {"stock": "300450", "start": "2025-04-01", "end": "2025-09-30"},
+    {"stock": "603083", "start": "2025-03-03", "end": "2025-08-29"},
+    {"stock": "600941", "start": "2025-07-01", "end": "2025-12-31"},
+    {"stock": "601857", "start": "2025-01-02", "end": "2025-06-30"},
+    {"stock": "300118", "start": "2025-06-02", "end": "2025-11-28"},
+    {"stock": "002475", "start": "2025-09-01", "end": "2025-12-31"}
+]
 
 # Config
 config = ConfigLoader()
@@ -395,6 +408,18 @@ async def get_dashboard():
 async def get_report_page():
     return HTMLResponse(content=open("backtest_report.html", "r", encoding="utf-8").read())
 
+
+@app.get("/logo.png")
+async def get_logo():
+    logo_path = os.path.abspath("logo.png")
+    if not os.path.exists(logo_path):
+        raise HTTPException(status_code=404, detail="logo not found")
+    return FileResponse(
+        logo_path,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"}
+    )
+
 @app.get("/api/search")
 async def search_stocks(q: str = ""):
     """Search stocks by code, name, or pinyin"""
@@ -416,7 +441,33 @@ async def api_strategies():
 @app.get("/api/strategy_manager/list")
 async def api_strategy_manager_list():
     try:
-        return {"status": "success", "strategies": list_all_strategy_meta()}
+        rows = list_all_strategy_meta()
+        ranking = []
+        if isinstance(latest_backtest_result, dict):
+            ranking = latest_backtest_result.get("ranking", []) or []
+        if (not ranking) and report_history:
+            latest_summary = (report_history[0] or {}).get("summary", {})
+            ranking = (latest_summary or {}).get("ranking", []) or []
+        score_map = {}
+        rating_map = {}
+        for r in ranking:
+            sid = str(r.get("strategy_id", "")).strip()
+            if not sid:
+                continue
+            sc = r.get("score_total", None)
+            rt = str(r.get("rating", "")).strip()
+            if isinstance(sc, numbers.Number):
+                score_map[sid] = float(sc)
+            if rt:
+                rating_map[sid] = rt
+        out = []
+        for row in rows:
+            sid = str(row.get("id", "")).strip()
+            item = dict(row)
+            item["score_total"] = score_map.get(sid, None)
+            item["rating"] = rating_map.get(sid, "")
+            out.append(item)
+        return {"status": "success", "strategies": out}
     except Exception as e:
         logger.error(f"/api/strategy_manager/list failed: {e}", exc_info=True)
         return {"status": "error", "msg": str(e), "strategies": []}
@@ -962,6 +1013,67 @@ def _build_backtest_kline_payload(stock_code, start_dt, end_dt):
     }
 
 
+def _pattern_thumb_path(stock_code, start_dt, end_dt):
+    os.makedirs(PATTERN_THUMB_DIR, exist_ok=True)
+    norm = _normalize_symbol(stock_code).replace(".", "_")
+    s = pd.to_datetime(start_dt).strftime("%Y%m%d")
+    e = pd.to_datetime(end_dt).strftime("%Y%m%d")
+    return os.path.join(PATTERN_THUMB_DIR, f"{norm}_{s}_{e}.png")
+
+
+def _render_pattern_thumb_png(stock_code, start_dt, end_dt):
+    import mplfinance as mpf
+    import matplotlib.pyplot as plt
+    img_path = _pattern_thumb_path(stock_code, start_dt, end_dt)
+    if os.path.exists(img_path):
+        return img_path
+    df = _get_cached_daily_df(stock_code, start_dt, end_dt)
+    if df is None or df.empty:
+        return None
+    if "dt" not in df.columns:
+        return None
+    for c in ["open", "high", "low", "close"]:
+        if c not in df.columns:
+            return None
+    plot_df = df[["dt", "open", "high", "low", "close"]].copy()
+    plot_df["Date"] = pd.to_datetime(plot_df["dt"])
+    plot_df = plot_df.set_index("Date")
+    plot_df = plot_df.rename(columns={"open": "Open", "high": "High", "low": "Low", "close": "Close"})
+    mc = mpf.make_marketcolors(up="#ef4444", down="#22c55e", edge="inherit", wick="inherit", volume="inherit")
+    s = mpf.make_mpf_style(base_mpf_style="charles", marketcolors=mc, facecolor="#020617", edgecolor="#334155", figcolor="#020617", gridcolor="#334155")
+    fig, _ = mpf.plot(
+        plot_df,
+        type="candle",
+        style=s,
+        volume=False,
+        title=f"{stock_code} 日K",
+        returnfig=True,
+        figsize=(4.4, 2.1),
+        xrotation=0
+    )
+    fig.savefig(img_path, format="png", dpi=130, bbox_inches="tight", pad_inches=0.05)
+    plt.close(fig)
+    return img_path
+
+
+def _warmup_classic_pattern_thumbs():
+    os.makedirs(PATTERN_THUMB_DIR, exist_ok=True)
+    ok = 0
+    for item in CLASSIC_PATTERN_ITEMS:
+        try:
+            stock_code = _normalize_symbol(item["stock"])
+            start_dt = pd.to_datetime(item["start"])
+            end_dt = pd.to_datetime(item["end"])
+            if pd.isna(start_dt) or pd.isna(end_dt) or start_dt > end_dt:
+                continue
+            p = _render_pattern_thumb_png(stock_code, start_dt, end_dt)
+            if p and os.path.exists(p):
+                ok += 1
+        except Exception:
+            continue
+    logger.info(f"classic pattern thumbs ready: {ok}/{len(CLASSIC_PATTERN_ITEMS)}")
+
+
 @app.get("/api/backtest/kline_data")
 async def api_backtest_kline_data(stock: str, start: str, end: str):
     try:
@@ -1051,6 +1163,23 @@ async def api_backtest_kline_chart(stock: str, start: str, end: str):
         return StreamingResponse(buf, media_type="image/png")
     except Exception as e:
         logger.error(f"/api/backtest/kline_chart failed: {e}", exc_info=True)
+        return Response(content=str(e), media_type="text/plain", status_code=500)
+
+
+@app.get("/api/backtest/kline_thumb")
+async def api_backtest_kline_thumb(stock: str, start: str, end: str):
+    try:
+        stock_code = _normalize_symbol(stock)
+        start_dt = pd.to_datetime(start)
+        end_dt = pd.to_datetime(end)
+        if pd.isna(start_dt) or pd.isna(end_dt) or start_dt > end_dt:
+            return Response(content="invalid date range", media_type="text/plain", status_code=400)
+        img_path = _render_pattern_thumb_png(stock_code, start_dt, end_dt)
+        if not img_path or not os.path.exists(img_path):
+            return Response(content="no data", media_type="text/plain", status_code=404)
+        return FileResponse(img_path, media_type="image/png")
+    except Exception as e:
+        logger.error(f"/api/backtest/kline_thumb failed: {e}", exc_info=True)
         return Response(content=str(e), media_type="text/plain", status_code=500)
 
 # --- Control Endpoints for External Systems (e.g. OpenClaw) ---
@@ -1438,6 +1567,7 @@ async def emit_event_to_ws(event_type, data):
 async def startup_event():
     logger.info("Initializing Cabinet Server...")
     load_report_history()
+    _warmup_classic_pattern_thumbs()
     
     # Log registered routes
     logger.info("--- Registered API Endpoints ---")

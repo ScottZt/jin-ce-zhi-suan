@@ -257,6 +257,11 @@ class BacktestCabinet:
                 await self._emit('backtest_flow', {'module': '中书省', 'level': 'system', 'msg': f'策略周期映射: {strategy_trigger_tf}'})
             report_interval = max(1, total_bars // 50)
             op_counter = 0
+            close_series = pd.to_numeric(df["close"], errors="coerce").ffill().bfill()
+            ma5_series = Indicators.MA(close_series, 5).fillna(close_series)
+            _, _, macd_series = Indicators.MACD(close_series)
+            macd_series = macd_series.fillna(0.0)
+            rsi_series = Indicators.RSI(close_series).fillna(50.0)
             col_idx = {c: i for i, c in enumerate(df.columns)}
             stage_started_at = perf_counter()
             for i, row in enumerate(df.itertuples(index=False, name=None)):
@@ -283,7 +288,15 @@ class BacktestCabinet:
                 if i % report_interval == 0:
                     progress = int((i / total_bars) * 100)
                     await self._emit('backtest_progress', {'progress': progress, 'current_date': str(kline['dt'])})
-                    await self._emit('market', {'price': float(kline['close']), 'ma5': float(kline['close']) * 0.99, 'macd': 0.0, 'rsi': 50.0, 'time': str(kline['dt'])})
+                    await self._emit('market', {
+                        'price': float(kline['close']),
+                        'ma5': float(ma5_series.iloc[i]),
+                        'macd': float(macd_series.iloc[i]),
+                        'rsi': float(rsi_series.iloc[i]),
+                        'time': str(kline['dt']),
+                        'kline_timeframe': '1分钟线',
+                        'kline_dt': str(kline['dt'])
+                    })
                     await self._emit_account_snapshot(kline, active_strategy_id=None, compliance_status="PASS")
                 current_dt = pd.to_datetime(kline["dt"])
                 runnable_strategy_ids = []
