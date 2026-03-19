@@ -480,7 +480,11 @@ class LiBuRites:
         print(f"评分卡总分：{scorecard['total_score']:.1f}/100 评级：{scorecard['grade']}（{scorecard['conclusion']}）")
         print("=" * 55 + "\n")
         trade_details = []
+        force_close_count = 0
         for t in transactions:
+            reason = str(t.get("reason", "") or "")
+            if reason == "FORCE_CLOSE_END":
+                force_close_count += 1
             trade_details.append({
                 "dt": str(t.get("dt", "")),
                 "direction": str(t.get("direction", "")),
@@ -488,8 +492,13 @@ class LiBuRites:
                 "quantity": int(t.get("quantity", 0) or 0),
                 "amount": float(t.get("amount", 0.0) or 0.0),
                 "cost": float(t.get("cost", 0.0) or 0.0),
-                "pnl": float(t.get("pnl", 0.0) or 0.0)
+                "pnl": float(t.get("pnl", 0.0) or 0.0),
+                "reason": reason
             })
+
+        report_notes = []
+        if force_close_count > 0:
+            report_notes.append(f"触发回测结束强制平仓 {force_close_count} 次（FORCE_CLOSE_END）")
 
         return {
             "strategy_id": strategy_id,
@@ -511,5 +520,7 @@ class LiBuRites:
             "max_loss_streak": int(max_loss_streak),
             "monthly_profit_ratio": float(monthly_profit_ratio),
             "scorecard": scorecard,
-            "trade_details": trade_details
+            "trade_details": trade_details,
+            "force_close_count": int(force_close_count),
+            "report_notes": report_notes
         }

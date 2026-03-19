@@ -106,6 +106,49 @@ class BacktestCabinet:
             return "D"
         return x
 
+    async def _force_close_positions_at_end(self, kline):
+        if not bool(self.config.get("execution.force_close_on_backtest_end", True)):
+            return
+        closed_any = False
+        for sid, stocks in list(self.state_affairs.positions.items()):
+            account = self.strategy_revenues.get(sid)
+            if account is None:
+                continue
+            for code, pos in list(stocks.items()):
+                qty = int(pos.get("qty", 0) or 0)
+                if qty <= 0:
+                    continue
+                order = {
+                    "strategy_id": sid,
+                    "code": code,
+                    "dt": kline["dt"],
+                    "direction": "SELL",
+                    "qty": qty,
+                    "price": float(kline.get("close", 0) or 0),
+                    "reason": "FORCE_CLOSE_END"
+                }
+                executed = self.state_affairs.execute_order(sid, order, kline, hu_bu_account=account)
+                if not executed:
+                    continue
+                self.secretariat.update_strategy_state(sid, code, 0)
+                closed_any = True
+                await self._emit('backtest_flow', {
+                    'module': '尚书省',
+                    'level': 'warning',
+                    'msg': f"回测结束强制平仓: 策略 {sid} SELL {code} x {qty}"
+                })
+                await self._emit('backtest_trade', {
+                    'dt': str(kline['dt']),
+                    'strategy': sid,
+                    'code': code,
+                    'dir': 'SELL',
+                    'price': float(kline.get('close', 0) or 0),
+                    'qty': qty,
+                    'reason': 'FORCE_CLOSE_END'
+                })
+        if closed_any:
+            await self._emit_account_snapshot(kline, active_strategy_id=None, compliance_status="PASS")
+
     async def _emit_loop(self):
         while True:
             item = await self._event_queue.get()
@@ -240,6 +283,8 @@ class BacktestCabinet:
             strategy_trigger_tf = {s.id: self._normalize_trigger_tf(getattr(s, "trigger_timeframe", "1min")) for s in self.strategies}
             needed_timeframes = sorted(set([tf for tf in strategy_trigger_tf.values() if tf != "1min"]))
             tf_dt_sets = {}
+            tf_row_maps = {}
+            tf_date_row_maps = {}
             for tf in needed_timeframes:
                 tf_df = self._cache_get(start_date, end_date, tf, provider_source)
                 if tf_df.empty:
@@ -258,6 +303,16 @@ class BacktestCabinet:
                 if tf_df.empty or "dt" not in tf_df.columns:
                     continue
                 tf_df["dt"] = pd.to_datetime(tf_df["dt"])
+                tf_df = tf_df.sort_values("dt")
+                row_map = {}
+                date_map = {}
+                for _, rr in tf_df.iterrows():
+                    dtt = pd.to_datetime(rr["dt"])
+                    row_obj = rr.to_dict()
+                    row_map[dtt] = row_obj
+                    date_map[dtt.date()] = row_obj
+                tf_row_maps[tf] = row_map
+                tf_date_row_maps[tf] = date_map
                 if tf != "D":
                     tf_dt_sets[tf] = set(tf_df["dt"].tolist())
             perf_period_build_ms = int((perf_counter() - stage_started_at) * 1000)
@@ -296,15 +351,51 @@ class BacktestCabinet:
                     kline["amount"] = kline["turnover"]
                 current_dt = pd.to_datetime(kline["dt"])
                 runnable_strategy_ids = []
+                strategy_kline_map = {}
                 for sid, tf in strategy_trigger_tf.items():
                     if tf == "1min":
                         runnable_strategy_ids.append(sid)
+                        strategy_kline_map[sid] = kline
                     elif tf == "D":
                         if current_dt in day_end_dt_set:
                             runnable_strategy_ids.append(sid)
+                            r = tf_date_row_maps.get("D", {}).get(current_dt.date())
+                            if isinstance(r, dict):
+                                k = {
+                                    "code": self.stock_code,
+                                    "dt": pd.to_datetime(r.get("dt", current_dt)),
+                                    "open": float(r.get("open", r.get("close", 0)) or 0),
+                                    "high": float(r.get("high", r.get("close", 0)) or 0),
+                                    "low": float(r.get("low", r.get("close", 0)) or 0),
+                                    "close": float(r.get("close", 0) or 0),
+                                    "vol": float(r.get("vol", r.get("volume", 0)) or 0),
+                                    "amount": float(r.get("amount", r.get("turnover", 0)) or 0)
+                                }
+                                k["volume"] = k["vol"]
+                                k["turnover"] = k["amount"]
+                                strategy_kline_map[sid] = k
+                            else:
+                                strategy_kline_map[sid] = kline
                     else:
                         if current_dt in tf_dt_sets.get(tf, set()):
                             runnable_strategy_ids.append(sid)
+                            r = tf_row_maps.get(tf, {}).get(current_dt)
+                            if isinstance(r, dict):
+                                k = {
+                                    "code": self.stock_code,
+                                    "dt": pd.to_datetime(r.get("dt", current_dt)),
+                                    "open": float(r.get("open", r.get("close", 0)) or 0),
+                                    "high": float(r.get("high", r.get("close", 0)) or 0),
+                                    "low": float(r.get("low", r.get("close", 0)) or 0),
+                                    "close": float(r.get("close", 0) or 0),
+                                    "vol": float(r.get("vol", r.get("volume", 0)) or 0),
+                                    "amount": float(r.get("amount", r.get("turnover", 0)) or 0)
+                                }
+                                k["volume"] = k["vol"]
+                                k["turnover"] = k["amount"]
+                                strategy_kline_map[sid] = k
+                            else:
+                                strategy_kline_map[sid] = kline
                 if i % report_interval == 0:
                     progress = int((i / total_bars) * 100)
                     await self._emit('backtest_progress', {'progress': progress, 'current_date': str(kline['dt'])})
@@ -325,7 +416,7 @@ class BacktestCabinet:
                 strategy_context = {
                     sid: {
                         "current_cash": float(self.strategy_revenues[sid].cash),
-                        "last_price": float(kline.get("close", 0.0))
+                        "last_price": float((strategy_kline_map.get(sid, kline) or {}).get("close", 0.0))
                     }
                     for sid in runnable_strategy_ids
                     if sid in self.strategy_revenues
@@ -333,7 +424,7 @@ class BacktestCabinet:
                 signals = self.secretariat.generate_signals(
                     kline,
                     runnable_strategy_ids=runnable_strategy_ids,
-                    strategy_context={"__by_strategy__": strategy_context}
+                    strategy_context={"__by_strategy__": strategy_context, "__kline_by_strategy__": strategy_kline_map}
                 )
                 if signals:
                     await self._emit('backtest_flow', {
@@ -424,6 +515,17 @@ class BacktestCabinet:
             perf_main_loop_ms = int((perf_counter() - stage_started_at) * 1000)
             await self._emit('backtest_progress', {'progress': 100, 'current_date': 'Done'})
             stage_started_at = perf_counter()
+            last_row = df.iloc[-1]
+            final_kline = {
+                "dt": pd.to_datetime(last_row["dt"]),
+                "code": self.stock_code,
+                "open": float(last_row.get("open", last_row.get("close", 0)) or 0),
+                "high": float(last_row.get("high", last_row.get("close", 0)) or 0),
+                "low": float(last_row.get("low", last_row.get("close", 0)) or 0),
+                "close": float(last_row.get("close", 0) or 0),
+                "volume": float(last_row.get("volume", last_row.get("vol", 0)) or 0)
+            }
+            await self._force_close_positions_at_end(final_kline)
             reports = []
             for s in self.strategies:
                 account = self.strategy_revenues.get(s.id)
@@ -447,6 +549,14 @@ class BacktestCabinet:
                     end_date=end_date,
                     summary_metrics=report
                 )
+                tf = strategy_trigger_tf.get(s.id, "1min")
+                formatted["kline_type"] = tf
+                if tf == "D":
+                    formatted["period_label"] = "日线"
+                elif tf.endswith("min"):
+                    formatted["period_label"] = tf.replace("min", "分钟")
+                else:
+                    formatted["period_label"] = tf
                 await self._emit('backtest_strategy_report', formatted)
             ranking = self.rites.generate_ranking(reports)
             ranking_dict = ranking.to_dict('records')

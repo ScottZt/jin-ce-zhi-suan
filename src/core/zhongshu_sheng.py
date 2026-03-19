@@ -19,6 +19,9 @@ class ZhongshuSheng:
         strategy_ctx_map = {}
         if isinstance(ctx.get("__by_strategy__"), dict):
             strategy_ctx_map = ctx.get("__by_strategy__")
+        strategy_kline_map = {}
+        if isinstance(ctx.get("__kline_by_strategy__"), dict):
+            strategy_kline_map = ctx.get("__kline_by_strategy__")
         for strategy in self.strategies:
             if runnable is not None and strategy.id not in runnable:
                 continue
@@ -32,7 +35,8 @@ class ZhongshuSheng:
                     scoped_ctx = ctx
                 if isinstance(scoped_ctx, dict) and scoped_ctx:
                     strategy.set_backtest_context(**scoped_ctx)
-            signal = strategy.on_bar(kline)
+            kline_for_strategy = strategy_kline_map.get(strategy.id, kline)
+            signal = strategy.on_bar(kline_for_strategy)
             if signal:
                 if "qty" not in signal or signal.get("qty") is None:
                     signal["qty"] = self._resolve_fallback_qty(strategy)

@@ -81,6 +81,8 @@ current_backtest_report = None
 current_backtest_progress = {"progress": 0, "current_date": None}
 current_backtest_trades = []
 kline_daily_cache = {}
+report_strategy_kline_cache = {}
+report_ai_review_cache = {}
 report_history = []
 REPORTS_DIR = os.path.join("data", "reports")
 REPORTS_FILE = os.path.join(REPORTS_DIR, "backtest_reports.json")
@@ -755,7 +757,8 @@ async def api_report_detail(report_id: str):
                     "request": r.get("request") if isinstance(r.get("request"), dict) else {},
                     "summary": summary,
                     "ranking": ranking,
-                    "strategy_reports": reports
+                    "strategy_reports": reports,
+                    "ai_review_text": str(r.get("ai_review_text", "") or "") or str(report_ai_review_cache.get(str(report_id), "") or "")
                 }
                 payload = _sanitize_non_finite(payload)
                 safe_payload = _safe_json_obj(payload)
@@ -770,9 +773,111 @@ async def api_report_detail(report_id: str):
         return {"summary": None, "ranking": [], "strategy_reports": []}
 
 
+def _build_ai_report_review(report_item):
+    cfg = ConfigLoader.reload()
+    api_key = str(cfg.get("data_provider.llm_api_key", "") or "").strip()
+    base_url = str(cfg.get("data_provider.llm_api_url", "") or "").strip()
+    model_name = str(cfg.get("data_provider.llm_model", "") or "gpt-4o-mini").strip()
+    if not api_key or not base_url:
+        return ""
+    summary = report_item.get("summary") if isinstance(report_item.get("summary"), dict) else {}
+    strategy_reports = report_item.get("strategy_reports") if isinstance(report_item.get("strategy_reports"), dict) else {}
+    compact_reports = []
+    for sid, rep in strategy_reports.items():
+        if not isinstance(rep, dict):
+            continue
+        trades = rep.get("trade_details") if isinstance(rep.get("trade_details"), list) else []
+        compact_reports.append({
+            "strategy_id": sid,
+            "kline_type": rep.get("kline_type"),
+            "period_label": rep.get("period_label"),
+            "score_total": rep.get("score_total"),
+            "annualized_roi": rep.get("annualized_roi"),
+            "max_dd": rep.get("max_dd"),
+            "win_rate": rep.get("win_rate"),
+            "total_trades": rep.get("total_trades"),
+            "force_close_count": rep.get("force_close_count", 0),
+            "last_trade_reason": trades[-1].get("reason") if trades else None
+        })
+    req_payload = {
+        "stock_code": report_item.get("stock_code"),
+        "request": report_item.get("request"),
+        "summary": summary,
+        "strategy_reports": compact_reports
+    }
+    url = base_url.rstrip("/")
+    if not url.endswith("/chat/completions"):
+        if url.endswith("/v1"):
+            url = f"{url}/chat/completions"
+        else:
+            url = f"{url}/v1/chat/completions"
+    system_prompt = "你是A股量化复盘分析师，请根据回测摘要给出结构化复盘：结论、问题定位、参数建议、下一次回测建议。"
+    user_prompt = (
+        "请输出简洁Markdown，包含四段：\n"
+        "1) 核心结论\n2) 关键问题\n3) 参数优化建议\n4) 下一轮实验方案\n\n"
+        f"回测数据：\n{json.dumps(req_payload, ensure_ascii=False)}"
+    )
+    payload = {
+        "model": model_name,
+        "temperature": 0.2,
+        "max_tokens": 1000,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    }
+    try:
+        req = urllib.request.Request(
+            url=url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            raw = resp.read().decode("utf-8")
+        obj = json.loads(raw)
+        return str(obj.get("choices", [{}])[0].get("message", {}).get("content", "")).strip()
+    except Exception:
+        return ""
+
+
+@app.post("/api/report/{report_id}/ai_review")
+async def api_report_ai_review(report_id: str):
+    try:
+        load_report_history()
+        for idx, r in enumerate(report_history if isinstance(report_history, list) else []):
+            if not isinstance(r, dict):
+                continue
+            if str(r.get("report_id")) != str(report_id):
+                continue
+            rid = str(report_id)
+            cached = str(report_ai_review_cache.get(rid, "") or "").strip()
+            if cached:
+                return {"status": "success", "report_id": report_id, "analysis": cached, "cached": True}
+            cached = str(r.get("ai_review_text", "") or "").strip()
+            if cached:
+                report_ai_review_cache[rid] = cached
+                return {"status": "success", "report_id": report_id, "analysis": cached, "cached": True}
+            analysis = _build_ai_report_review(r)
+            if not analysis:
+                return {"status": "error", "msg": "AI复盘生成失败，请检查模型配置"}
+            report_history[idx]["ai_review_text"] = analysis
+            report_ai_review_cache[rid] = analysis
+            persist_report_history()
+            return {"status": "success", "report_id": report_id, "analysis": analysis, "cached": False}
+        return {"status": "error", "msg": "report not found"}
+    except Exception as e:
+        logger.error(f"/api/report/{report_id}/ai_review failed: {e}", exc_info=True)
+        return {"status": "error", "msg": str(e)}
+
+
 @app.get("/api/report/strategy/kline_data")
 async def api_report_strategy_kline_data(report_id: str, strategy_id: str):
     try:
+        cache_key = f"{str(report_id)}|{str(strategy_id)}"
+        cached_payload = report_strategy_kline_cache.get(cache_key)
+        if isinstance(cached_payload, dict):
+            return cached_payload
         load_report_history()
         target_report = None
         for r in report_history if isinstance(report_history, list) else []:
@@ -797,7 +902,7 @@ async def api_report_strategy_kline_data(report_id: str, strategy_id: str):
         end_dt = pd.to_datetime(end_text)
         if pd.isna(start_dt) or pd.isna(end_dt):
             return {"status": "error", "msg": "invalid strategy period"}
-        period_label = _strategy_period_label(strategy_id)
+        period_label = _strategy_period_label(strategy_id, srep=srep)
         interval = _period_label_to_interval(period_label)
         provider = _select_provider()
         df = provider.fetch_kline_data(stock_code, start_dt, end_dt, interval=interval) if hasattr(provider, "fetch_kline_data") else pd.DataFrame()
@@ -855,7 +960,7 @@ async def api_report_strategy_kline_data(report_id: str, strategy_id: str):
                 "color": "#a855f7" if is_buy else "#06b6d4",
                 "text": f"{'买' if is_buy else '卖'} {price_val:.2f}"
             })
-        return {
+        payload = {
             "status": "success",
             "stock": stock_code,
             "interval": interval,
@@ -865,6 +970,12 @@ async def api_report_strategy_kline_data(report_id: str, strategy_id: str):
             "volumes": volumes,
             "markers": markers
         }
+        report_strategy_kline_cache[cache_key] = payload
+        if len(report_strategy_kline_cache) > 300:
+            first_key = next(iter(report_strategy_kline_cache))
+            if first_key != cache_key:
+                report_strategy_kline_cache.pop(first_key, None)
+        return payload
     except Exception as e:
         logger.error(f"/api/report/strategy_kline_data failed: {e}", exc_info=True)
         return {"status": "error", "msg": str(e)}
@@ -872,7 +983,7 @@ async def api_report_strategy_kline_data(report_id: str, strategy_id: str):
 
 @app.post("/api/report/delete")
 async def api_report_delete(req: ReportDeleteRequest):
-    global report_history, latest_backtest_result, latest_strategy_reports
+    global report_history, latest_backtest_result, latest_strategy_reports, report_strategy_kline_cache, report_ai_review_cache
     rid = str(req.report_id or "").strip()
     if not rid:
         return {"status": "error", "msg": "report_id is required"}
@@ -882,6 +993,8 @@ async def api_report_delete(req: ReportDeleteRequest):
         report_history = [r for r in report_history if str(r.get("report_id")) != rid] if isinstance(report_history, list) else []
         deleted = len(report_history) != before
         if deleted:
+            report_ai_review_cache.pop(rid, None)
+            report_strategy_kline_cache = {k: v for k, v in report_strategy_kline_cache.items() if not str(k).startswith(f"{rid}|")}
             persist_report_history()
             latest_backtest_result = None
             latest_strategy_reports = {}
@@ -931,21 +1044,32 @@ def _period_label_to_interval(period_label):
     return "D"
 
 
-def _strategy_period_label(strategy_id):
+def _kline_type_to_period_label(kline_type):
+    tf = str(kline_type or "").strip()
+    low = tf.lower()
+    if low in {"d", "1d", "day", "daily"}:
+        return "日线"
+    if low.endswith("min"):
+        return f"{low.replace('min', '')}分钟"
+    return tf or "1分钟"
+
+
+def _strategy_period_label(strategy_id, srep=None):
+    if isinstance(srep, dict):
+        tf = str(srep.get("kline_type", "")).strip()
+        if tf:
+            return _kline_type_to_period_label(tf)
+        pl = str(srep.get("period_label", "")).strip()
+        if pl:
+            return pl
     sid = str(strategy_id or "")
-    mapping = {
-        "00": "日线",
-        "01": "60分钟",
-        "02": "1分钟",
-        "03": "日线",
-        "04": "日线",
-        "05": "30分钟",
-        "06": "1分钟",
-        "07": "15分钟",
-        "08": "1分钟",
-        "09": "日线",
-    }
-    return mapping.get(sid, "1分钟")
+    try:
+        for item in list_all_strategy_meta():
+            if str(item.get("id", "")) == sid:
+                return _kline_type_to_period_label(item.get("kline_type", "1min"))
+    except Exception:
+        pass
+    return "1分钟"
 
 
 def _cache_key_daily(stock_code, start_dt, end_dt):
@@ -994,7 +1118,14 @@ def _build_backtest_kline_payload(stock_code, start_dt, end_dt):
     progress_date = None
     progress_date_text = None
     if current_backtest_report:
-        current_date = pd.to_datetime(current_backtest_progress.get("current_date"))
+        raw_current_date = current_backtest_progress.get("current_date")
+        text_current_date = str(raw_current_date or "").strip()
+        if text_current_date.lower() == "done":
+            current_date = pd.to_datetime(end_dt, errors="coerce")
+        elif text_current_date.lower() == "failed":
+            current_date = pd.NaT
+        else:
+            current_date = pd.to_datetime(raw_current_date, errors="coerce")
         if not pd.isna(current_date):
             progress_date = current_date
             progress_date_text = current_date.strftime("%Y-%m-%d")
