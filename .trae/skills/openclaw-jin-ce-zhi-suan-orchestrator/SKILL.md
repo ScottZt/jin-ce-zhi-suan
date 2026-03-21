@@ -272,6 +272,45 @@ curl -s -X POST http://127.0.0.1:8000/api/strategy_manager/analyze \
   -d "{\"template_text\":\"趋势+回撤控制，偏稳健\",\"strategy_name\":\"稳健趋势策略\"}"
 ```
 
+#### 策略修改与维护接口（已上线，可直接编排）
+
+- `POST /api/strategy_manager/add`：新增策略（通常接 analyze 结果后落库）
+- `POST /api/strategy_manager/update`：修改策略名称/代码/说明/来源/周期等
+- `POST /api/strategy_manager/delete`：删除策略
+- `POST /api/strategy_manager/toggle`：启用或禁用策略
+
+示例（新增策略）：
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/strategy_manager/add \
+  -H "Content-Type: application/json" \
+  -d "{\"strategy_id\":\"98\",\"strategy_name\":\"稳健趋势策略\",\"class_name\":\"Strategy98\",\"code\":\"class Strategy98: pass\",\"analysis_text\":\"测试策略\"}"
+```
+
+示例（修改策略）：
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/strategy_manager/update \
+  -H "Content-Type: application/json" \
+  -d "{\"strategy_id\":\"98\",\"strategy_name\":\"稳健趋势策略V2\",\"analysis_text\":\"更新止损规则\"}"
+```
+
+示例（启停策略）：
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/strategy_manager/toggle \
+  -H "Content-Type: application/json" \
+  -d "{\"strategy_id\":\"98\",\"enabled\":true}"
+```
+
+示例（删除策略）：
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/strategy_manager/delete \
+  -H "Content-Type: application/json" \
+  -d "{\"strategy_id\":\"98\"}"
+```
+
 ---
 
 ### 4.5 策略介绍接口扩展规划（预留，未上线前禁止调用）
@@ -311,7 +350,11 @@ curl -s -X POST http://127.0.0.1:8000/api/strategy_manager/analyze \
    - 若返回 `not_found`，明确告知用户策略不存在
 4. 若是“策略介绍生成”诉求：
    - 调 `POST /api/strategy_manager/analyze` 或 `analyze_market`
-5. 任何失败都要走异常兜底回复，禁止只返回“处理中”
+5. 若是“修改策略/启停策略/删除策略”诉求：
+   - 修改：`POST /api/strategy_manager/update`
+   - 启停：`POST /api/strategy_manager/toggle`
+   - 删除：`POST /api/strategy_manager/delete`
+6. 任何失败都要走异常兜底回复，禁止只返回“处理中”
 
 ## 6) 进度播报规范（重点）
 
@@ -393,7 +436,7 @@ Final result must conform to this schema:
   "required": ["trace_id", "operation", "status", "meta", "summary", "ranking", "strategy_reports", "logs"],
   "properties": {
     "trace_id": { "type": "string" },
-    "operation": { "type": "string", "enum": ["start_backtest", "start_live", "stop_task", "fetch_report", "list_strategies", "get_strategy_detail", "analyze_strategy"] },
+    "operation": { "type": "string", "enum": ["start_backtest", "start_live", "stop_task", "fetch_report", "list_strategies", "get_strategy_detail", "analyze_strategy", "add_strategy", "update_strategy", "toggle_strategy", "delete_strategy"] },
     "status": { "type": "string", "enum": ["SUCCESS", "FAILED", "TASK_STALLED", "PARTIAL_SUCCESS"] },
     "meta": {
       "type": "object",
