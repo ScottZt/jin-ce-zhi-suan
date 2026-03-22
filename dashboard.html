@@ -977,6 +977,7 @@
         const RENDER_QUEUE_MAX = 1500;
         const RENDER_CRITICAL_TYPES = new Set(['system', 'backtest_result', 'backtest_failed', 'backtest_strategy_report', 'menxia', 'shangshu']);
         const RENDER_COALESCE_TYPES = new Set(['market', 'live_tick', 'ministry_tick', 'backtest_progress']);
+        const BACKTEST_STREAM_TYPES = new Set(['backtest_progress', 'backtest_flow', 'backtest_trade', 'ministry_tick']);
         const renderHighQueue = [];
         const renderNormalQueue = [];
         const renderCoalesceMap = new Map();
@@ -1091,6 +1092,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         let backtestBtnState = BACKTEST_BTN_STATE.idle;
         let backtestStatusMonitorTimer = null;
         let backtestMonitorErrorCount = 0;
+        let backtestStreamClosed = false;
         const STRATEGY_GUIDE = {
             all: {
                 name: '全部策略总览',
@@ -1320,7 +1322,29 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
 
         function enqueueIncomingEvent(payload) {
             if (!payload || typeof payload !== 'object') return;
+            if (backtestStreamClosed && BACKTEST_STREAM_TYPES.has(String(payload.type || ''))) return;
             handleEvent(payload);
+        }
+
+        function closeBacktestStream() {
+            backtestStreamClosed = true;
+            for (let i = renderHighQueue.length - 1; i >= 0; i--) {
+                const x = renderHighQueue[i];
+                if (x && BACKTEST_STREAM_TYPES.has(String(x.type || ''))) {
+                    renderHighQueue.splice(i, 1);
+                }
+            }
+            for (let i = renderNormalQueue.length - 1; i >= 0; i--) {
+                const x = renderNormalQueue[i];
+                if (x && BACKTEST_STREAM_TYPES.has(String(x.type || ''))) {
+                    renderNormalQueue.splice(i, 1);
+                }
+            }
+            for (const [k, x] of renderCoalesceMap.entries()) {
+                if (x && BACKTEST_STREAM_TYPES.has(String(x.type || ''))) {
+                    renderCoalesceMap.delete(k);
+                }
+            }
         }
 
         async function loadLatestStrategyScores() {
@@ -1388,9 +1412,11 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 case 'system':
                     logMessage('SYSTEM', data.msg, 'system');
                     if ((data.msg || '').includes('回测完成')) {
+                        closeBacktestStream();
                         setBacktestButtonState(BACKTEST_BTN_STATE.idle);
                     }
                     if ((data.msg || '').includes('回测已手动终止')) {
+                        closeBacktestStream();
                         setBacktestButtonState(BACKTEST_BTN_STATE.idle);
                     }
                     if ((data.msg || '').includes('实时监控已启动')) {
@@ -1510,9 +1536,15 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     updateMinistryTick(data);
                     break;
                 case 'backtest_result':
+                    closeBacktestStream();
                     showBacktestResults(data);
                     setBacktestButtonState(BACKTEST_BTN_STATE.idle);
                     refreshKlineModalImage(true);
+                    break;
+                case 'backtest_failed':
+                    closeBacktestStream();
+                    setBacktestButtonState(BACKTEST_BTN_STATE.error);
+                    logMessage('回测', data?.msg || '回测失败', 'danger');
                     break;
                 case 'backtest_strategy_report':
                     upsertStrategyReport(data);
@@ -3310,16 +3342,19 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 const reportStatus = String(data.current_report_status || '').toLowerCase();
                 const reportError = data.current_report_error;
                 if (reportStatus === 'failed' || reportError) {
+                    closeBacktestStream();
                     logMessage('回测', reportError || '回测任务异常终止', 'danger');
                     setBacktestButtonState(BACKTEST_BTN_STATE.error);
                     return;
                 }
                 if (reportStatus === 'cancelled') {
+                    closeBacktestStream();
                     logMessage('回测', '回测已终止', 'warning');
                     setBacktestButtonState(BACKTEST_BTN_STATE.idle);
                     return;
                 }
                 if (reportStatus === 'success') {
+                    closeBacktestStream();
                     if (!backtestResultRecovered) {
                         await recoverBacktestResultFromApi();
                         backtestResultRecovered = true;
@@ -3377,6 +3412,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (overlay) overlay.classList.remove('active');
             strategyReportsBuffer = [];
             backtestResultRecovered = false;
+            backtestStreamClosed = false;
             document.getElementById('bt-strategy-reports').innerHTML = '';
             
             const code = normalizeCode(document.getElementById('stock-search-input').value || '600036.SH');
