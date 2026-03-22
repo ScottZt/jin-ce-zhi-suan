@@ -1430,9 +1430,9 @@ def _build_backtest_kline_payload(stock_code, start_dt, end_dt):
     ]
     strategy_ids = sorted(set(str(t.get("strategy", "")).strip() for t in trades if str(t.get("strategy", "")).strip()))
     palette = [
-        "#ff1744", "#00e676", "#2979ff", "#ffea00", "#d500f9", "#00e5ff", "#ff9100", "#00c853",
-        "#651fff", "#ff3d00", "#00b0ff", "#aeea00", "#f50057", "#76ff03", "#304ffe", "#ffd600",
-        "#aa00ff", "#64dd17", "#c51162", "#1de9b6", "#3d5afe", "#ff6d00", "#00bfa5", "#ff4081"
+        "#60a5fa", "#a78bfa", "#22d3ee", "#f59e0b", "#f472b6", "#38bdf8", "#c084fc", "#fb7185",
+        "#2dd4bf", "#fbbf24", "#818cf8", "#06b6d4", "#e879f9", "#0ea5e9", "#f97316", "#8b5cf6",
+        "#14b8a6", "#93c5fd", "#f0abfc", "#67e8f9", "#fcd34d", "#7dd3fc", "#d8b4fe", "#f9a8d4"
     ]
     color_map = {sid: palette[i % len(palette)] for i, sid in enumerate(strategy_ids)}
     strategy_name_map = {str(x.get("id", "")): str(x.get("name", "")) for x in list_all_strategy_meta()}
