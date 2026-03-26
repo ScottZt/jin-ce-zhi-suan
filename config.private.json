@@ -1,0 +1,9 @@
+{
+  "data_provider": {
+    "tushare_token": "4ba065ecb8eebdebc93dffaef6bc051eeb3a98b46eb7d94fd697282f",
+    "default_api_key": "abc123",
+    "llm_api_key": "sk-iYutsmarHYAYNFieaEZ38VIikvU4q0KuEeGspoNR6f85IcOj",
+    "strategy_llm_api_key": "sk-dngogusiilqugivqgcnvdkimckoviiwhhfinuwrjgjtlzmli",
+     "default_api_url": "https://filing-vip-fioricet-quarters.trycloudflare.com"
+  }
+}
