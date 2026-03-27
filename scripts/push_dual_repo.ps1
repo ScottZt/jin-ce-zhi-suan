@@ -179,6 +179,10 @@ $privateStashCreated = $false
 $entryStashCreated = $false
 $entryStashTag = "dual-repo-entry-temp-" + [DateTime]::Now.ToString("yyyyMMddHHmmssfff")
 $publicPushFailed = $false
+$publicWorkBranch = "__dual_repo_public_work__"
+$privateStrategyGuardPath = "data/strategies/custom_strategies.private.json"
+$sourceCommitBeforePublic = ""
+$sourcePrivateFileExistsBeforePublic = $false
 
 try {
     if ($SkipPublicPush -and $SkipPrivatePush) {
@@ -200,19 +204,19 @@ try {
     )
     Ensure-Remote -Name $PublicRemote -Url $PublicRepoUrl
     Ensure-Remote -Name $PrivateRemote -Url $PrivateRepoUrl
-    Ensure-LocalBranch -BranchName $PrivateBranch -FromBranch $PublicBranch
+    Ensure-LocalBranch -BranchName $PrivateBranch -FromBranch $effectivePublicSourceBranch
     Ensure-BranchExists -BranchName $effectivePublicSourceBranch
+    $sourceCommitBeforePublic = (Invoke-Git -Args @("rev-parse", $effectivePublicSourceBranch) -ReadOnly).Output[0].Trim()
+    $sourcePrivateSpecBefore = "{0}:{1}" -f $effectivePublicSourceBranch, $privateStrategyGuardPath
+    $sourcePrivateFileProbeBefore = Invoke-Git -Args @("cat-file", "-e", $sourcePrivateSpecBefore) -AllowFailure -ReadOnly
+    $sourcePrivateFileExistsBeforePublic = $sourcePrivateFileProbeBefore.ExitCode -eq 0
 
     $entryBefore = @((Invoke-Git -Args @("stash", "list") -ReadOnly).Output).Count
     Invoke-Git -Args @("stash", "push", "--include-untracked", "-m", $entryStashTag) -AllowFailure | Out-Null
     $entryAfter = @((Invoke-Git -Args @("stash", "list") -ReadOnly).Output).Count
     $entryStashCreated = $entryAfter -gt $entryBefore
 
-    Invoke-Git -Args @("checkout", $PublicBranch) | Out-Null
-    if ($effectivePublicSourceBranch -ne $PublicBranch) {
-        Write-Host "提示：公共推送源分支为 $effectivePublicSourceBranch，将先合并到 $PublicBranch。"
-        Invoke-Git -Args @("merge", $effectivePublicSourceBranch, "--no-edit") | Out-Null
-    }
+    Invoke-Git -Args @("checkout", "-B", $publicWorkBranch, $effectivePublicSourceBranch) | Out-Null
     if ($UseLocalCommits) {
         if (Has-WorkingChanges) {
             throw "已启用 -UseLocalCommits：检测到未提交改动，请先手动提交后再执行脚本。"
@@ -233,13 +237,13 @@ try {
     } else {
         Invoke-Git -Args @("fetch", $PublicRemote, $PublicBranch) -AllowFailure | Out-Null
         $publicRemoteRef = "$PublicRemote/$PublicBranch"
-        $aheadCount = Get-AheadCount -LocalRef $PublicBranch -RemoteRef $publicRemoteRef
+        $aheadCount = Get-AheadCount -LocalRef "HEAD" -RemoteRef $publicRemoteRef
         if ($aheadCount -eq 0) {
             Write-Host "提示：$PublicBranch 相对 $publicRemoteRef 没有新增提交，push 可能显示 up-to-date。"
         } elseif ($aheadCount -gt 0) {
             Write-Host "提示：检测到 $aheadCount 个待推送提交到 $publicRemoteRef。"
         }
-        $publicPushResult = Invoke-Git -Args @("push", $PublicRemote, $PublicBranch) -AllowFailure
+        $publicPushResult = Invoke-Git -Args @("push", $PublicRemote, "HEAD:$PublicBranch") -AllowFailure
         if ($publicPushResult.ExitCode -ne 0) {
             $publicPushFailed = $true
             if ($StrictPublicPush) {
@@ -247,6 +251,17 @@ try {
             }
             Write-Host "警告：public push 失败，继续执行 private push。"
             Write-Host ($publicPushResult.Output -join "`n")
+        }
+    }
+    $sourceCommitAfterPublic = (Invoke-Git -Args @("rev-parse", $effectivePublicSourceBranch) -ReadOnly).Output[0].Trim()
+    if ($sourceCommitAfterPublic -ne $sourceCommitBeforePublic) {
+        throw "保护触发：公共阶段意外改动了源分支 $effectivePublicSourceBranch（$sourceCommitBeforePublic -> $sourceCommitAfterPublic），已中止。"
+    }
+    if ($sourcePrivateFileExistsBeforePublic) {
+        $sourcePrivateSpecAfter = "{0}:{1}" -f $effectivePublicSourceBranch, $privateStrategyGuardPath
+        $sourcePrivateFileProbeAfter = Invoke-Git -Args @("cat-file", "-e", $sourcePrivateSpecAfter) -AllowFailure -ReadOnly
+        if ($sourcePrivateFileProbeAfter.ExitCode -ne 0) {
+            throw "保护触发：公共阶段后检测到 $privateStrategyGuardPath 在源分支中丢失，已中止。"
         }
     }
 
@@ -259,7 +274,7 @@ try {
         $privateStashCreated = $stashAfterCount -gt $stashBeforeCount
 
         Invoke-Git -Args @("checkout", $PrivateBranch) | Out-Null
-        Invoke-Git -Args @("merge", $PublicBranch, "--no-edit") | Out-Null
+        Invoke-Git -Args @("merge", $effectivePublicSourceBranch, "--no-edit") | Out-Null
         if ($privateStashCreated) {
             Invoke-Git -Args @("stash", "apply", "stash@{0}") | Out-Null
             Invoke-Git -Args @("stash", "drop", "stash@{0}") | Out-Null
@@ -288,6 +303,10 @@ finally {
         $currentBranch = (Invoke-Git -Args @("rev-parse", "--abbrev-ref", "HEAD") -ReadOnly).Output[0].Trim()
         if ($currentBranch -ne $startBranch) {
             Invoke-Git -Args @("checkout", $startBranch) -AllowFailure | Out-Null
+        }
+        $publicWorkBranchVerify = Invoke-Git -Args @("rev-parse", "--verify", $publicWorkBranch) -AllowFailure -ReadOnly
+        if ($publicWorkBranchVerify.ExitCode -eq 0 -and $startBranch -ne $publicWorkBranch) {
+            Invoke-Git -Args @("branch", "-D", $publicWorkBranch) -AllowFailure | Out-Null
         }
         if ($entryStashCreated) {
             $entryRef = Find-StashRefByMessage -Message $entryStashTag
