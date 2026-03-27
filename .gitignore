@@ -8,7 +8,7 @@ __pycache__/
 .mypy_cache/
 .trae/
 config.private.json
-data/strategies/custom_strategies.private.json
+
 .env
 .env.*
 
