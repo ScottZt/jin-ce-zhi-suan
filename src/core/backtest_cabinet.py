@@ -33,6 +33,13 @@ class BacktestCabinet:
         self.strategy_mode = strategy_mode
         self.strategy_ids = strategy_ids
         self.config = ConfigLoader.reload()
+        self.baseline_meta = {
+            "profile_name": str(self.config.get("global_backtest_baseline.last_applied_profile", "") or ""),
+            "market": str(self.config.get("global_backtest_baseline.last_applied_market", "") or ""),
+            "adjustment_mode": str(self.config.get("data_provider.adjustment_mode", "") or ""),
+            "settlement_rule": str(self.config.get("execution.settlement_rule", "") or ""),
+            "data_source": str(self.config.get("data_provider.source", "default") or "default")
+        }
         
         # Initialize Ministries
         self.personnel = LiBuPersonnel()
@@ -804,6 +811,7 @@ class BacktestCabinet:
                     formatted["period_label"] = tf.replace("min", "分钟")
                 else:
                     formatted["period_label"] = tf
+                formatted["baseline_meta"] = dict(self.baseline_meta)
                 await self._emit('backtest_strategy_report', formatted)
             ranking = self.rites.generate_ranking(reports)
             ranking_dict = ranking.to_dict('records')
@@ -814,6 +822,7 @@ class BacktestCabinet:
                 'period': f"{start_date.date()} - {end_date.date()}",
                 'ranking': ranking_dict,
                 'total_trades': sum(r['total_trades'] for r in reports),
+                'baseline_meta': dict(self.baseline_meta),
                 'perf_ms': {
                     'data_fetch': perf_data_fetch_ms,
                     'period_build': perf_period_build_ms,

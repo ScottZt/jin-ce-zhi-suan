@@ -18,7 +18,8 @@
     "strategy_llm_api_key": "",
     "strategy_llm_model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
     "strategy_llm_timeout_sec": 240,
-    "api_key": ""
+    "api_key": "",
+    "adjustment_mode": "none"
   },
   "targets": [
     "301227.SZ"
@@ -52,13 +53,180 @@
     "max_drawdown_pct": 0.06
   },
   "trading_cost": {
-    "commission_rate": 0.0002,
-    "min_commission": 23,
-    "stamp_duty": 0,
+    "commission_rate": 0.00025,
+    "min_commission": 5.0,
+    "stamp_duty": 0.001,
     "transfer_fee": 0
   },
   "execution": {
-    "slippage": 0.001
+    "slippage": 0.001,
+    "settlement_rule": "T+1"
+  },
+  "global_backtest_baseline": {
+    "enabled": true,
+    "default_profile": "cn_equity_mid_long",
+    "fallback_profile": "cn_equity_mid_long",
+    "enforce_defaults": true,
+    "min_history_years": 5,
+    "require_regime_coverage": true,
+    "lock_backtest_data_source": true,
+    "fixed_data_source": "default",
+    "strategy_profile_mapping": [
+      {
+        "rule_id": "r1_cn_equity_mid_long",
+        "if": {
+          "market": [
+            "A股"
+          ],
+          "strategy_tags_any": [
+            "中线",
+            "波段",
+            "长线",
+            "量化",
+            "价值"
+          ]
+        },
+        "then_profile": "cn_equity_mid_long"
+      },
+      {
+        "rule_id": "r2_cn_equity_tech_short",
+        "if": {
+          "market": [
+            "A股"
+          ],
+          "strategy_tags_any": [
+            "短线",
+            "形态",
+            "突破",
+            "均线",
+            "MACD"
+          ]
+        },
+        "then_profile": "cn_equity_tech_short"
+      },
+      {
+        "rule_id": "r3_cn_equity_intraday",
+        "if": {
+          "market": [
+            "A股"
+          ],
+          "strategy_tags_any": [
+            "超短",
+            "日内",
+            "打板",
+            "成本核对"
+          ]
+        },
+        "then_profile": "cn_equity_intraday"
+      },
+      {
+        "rule_id": "r4_t0_markets",
+        "if": {
+          "market_any": [
+            "可转债",
+            "港股",
+            "美股",
+            "ETF_T0"
+          ],
+          "supports_t0": true
+        },
+        "then_profile": "t0_cross_market"
+      }
+    ],
+    "profiles": {
+      "cn_equity_mid_long": {
+        "asset_scope": "A股中长线/量化",
+        "adjustment_mode": "hfq",
+        "settlement_rule": "T+1",
+        "cost_model": {
+          "commission_rate": 0.00025,
+          "min_commission": 5,
+          "stamp_duty_sell": 0.001,
+          "slippage": 0.001
+        }
+      },
+      "cn_equity_tech_short": {
+        "asset_scope": "A股短线技术形态",
+        "adjustment_mode": "qfq",
+        "settlement_rule": "T+1",
+        "cost_model": {
+          "commission_rate": 0.00025,
+          "min_commission": 5,
+          "stamp_duty_sell": 0.001,
+          "slippage": 0.001
+        }
+      },
+      "cn_equity_intraday": {
+        "asset_scope": "A股超短线/成本核对",
+        "adjustment_mode": "none",
+        "settlement_rule": "T+1",
+        "cost_model": {
+          "commission_rate": 0.00025,
+          "min_commission": 5,
+          "stamp_duty_sell": 0.001,
+          "slippage": 0.001
+        }
+      },
+      "t0_cross_market": {
+        "asset_scope": "可转债/港股/美股/T+0品种",
+        "adjustment_mode": "hfq",
+        "settlement_rule": "T+0",
+        "cost_model": {
+          "commission_rate": 0.00025,
+          "min_commission": 5,
+          "stamp_duty_sell": 0.001,
+          "slippage": 0.001
+        }
+      }
+    },
+    "last_applied_profile": "cn_equity_intraday",
+    "last_applied_market": "A股"
+  },
+  "live_monitoring": {
+    "sync_with_backtest_cost_model": true,
+    "consistency_checks": {
+      "enforce_adjustment_and_settlement_match": true,
+      "signal_execution_delay_seconds_warn": 5,
+      "signal_execution_delay_seconds_critical": 15,
+      "expected_vs_actual_price_deviation_warn": 0.003,
+      "expected_vs_actual_price_deviation_critical": 0.008
+    },
+    "risk_alerts": {
+      "daily_drawdown_warn": 0.02,
+      "daily_drawdown_critical": 0.03,
+      "max_drawdown_critical": 0.15,
+      "max_consecutive_losses_warn": 3,
+      "max_consecutive_losses_critical": 5,
+      "single_position_weight_warn": 0.15,
+      "single_position_weight_critical": 0.2,
+      "turnover_rate_warn": 0.5,
+      "turnover_rate_critical": 0.8
+    },
+    "execution_alerts": {
+      "liquidity_insufficient_warn": true,
+      "limit_hit_fail_warn": true,
+      "suspension_fail_warn": true
+    },
+    "drift_detection": {
+      "rolling_days": 20,
+      "win_rate_drop_warn": 0.08,
+      "profit_loss_ratio_drop_warn": 0.2,
+      "max_drawdown_expansion_warn": 0.3
+    },
+    "actions": {
+      "on_warn": [
+        "reduce_position"
+      ],
+      "on_critical": [
+        "pause_strategy",
+        "switch_to_observation",
+        "manual_review"
+      ]
+    },
+    "reporting": {
+      "daily_t1_deviation_report": true,
+      "weekly_attribution_report": true
+    }
   },
   "strategy_params": {
     "common": {

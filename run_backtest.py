@@ -5,6 +5,7 @@ import json
 import os
 import time
 from src.core.backtest_cabinet import BacktestCabinet
+from src.utils.backtest_baseline import apply_backtest_baseline
 
 REPORTS_DIR = os.path.join("data", "reports")
 REPORTS_FILE = os.path.join(REPORTS_DIR, "backtest_reports.json")
@@ -53,6 +54,20 @@ async def main():
     parser.add_argument("--top5", action="store_true", help="Use top 5 strategies")
     parser.add_argument("--strategy", default="all", help="Specific strategy id if not using --top5")
     args = parser.parse_args()
+    baseline_result = apply_backtest_baseline(
+        stock_code=args.stock,
+        strategy_id=args.strategy,
+        strategy_mode="top5" if args.top5 else None
+    )
+    if baseline_result.get("applied"):
+        print(
+            "[BASELINE] "
+            f"profile={baseline_result.get('profile_name','')} "
+            f"market={baseline_result.get('market','')} "
+            f"adj={baseline_result.get('adjustment_mode','')} "
+            f"settlement={baseline_result.get('settlement_rule','')} "
+            f"source={baseline_result.get('data_source','')}"
+        )
 
     events = {
         "progress": 0,

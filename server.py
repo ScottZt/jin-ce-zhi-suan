@@ -43,6 +43,7 @@ from src.utils.data_provider import DataProvider
 from src.utils.tushare_provider import TushareProvider
 from src.utils.akshare_provider import AkshareProvider
 from src.utils.history_sync_service import HistoryDiffSyncService, TABLE_INTERVAL_MAP
+from src.utils.backtest_baseline import apply_backtest_baseline
 
 import logging
 
@@ -2027,6 +2028,13 @@ async def api_set_source(req: SourceSwitchRequest):
     source = str(req.source or "").lower().strip()
     if source not in {"default", "tushare", "akshare"}:
         return {"status": "error", "msg": "source must be one of: default, tushare, akshare"}
+    cfg = ConfigLoader.reload()
+    if _system_mode(cfg) == "backtest":
+        baseline = cfg.get("global_backtest_baseline", {})
+        lock_source = bool((baseline or {}).get("lock_backtest_data_source", True))
+        fixed_source = str((baseline or {}).get("fixed_data_source", "default") or "default").strip().lower()
+        if lock_source and source != fixed_source:
+            return {"status": "error", "msg": f"回测模式已锁定数据源为 {fixed_source}，不允许切换为 {source}"}
     config.set("data_provider.source", source)
     current_provider_source = source
     restarted = False
@@ -2377,7 +2385,23 @@ async def run_backtest_task(stock_code, strategy_id, strategy_mode=None, start=N
         end,
         capital,
     )
+    baseline_result = apply_backtest_baseline(
+        stock_code=stock_code,
+        strategy_id=strategy_id,
+        strategy_mode=strategy_mode,
+        strategy_ids=strategy_ids
+    )
     cfg = ConfigLoader.reload()
+    if baseline_result.get("applied"):
+        profile_name = baseline_result.get("profile_name", "")
+        msg = (
+            f"已应用回测基线Profile={profile_name} "
+            f"market={baseline_result.get('market', '')} "
+            f"adj={baseline_result.get('adjustment_mode', '')} "
+            f"settlement={baseline_result.get('settlement_rule', '')} "
+            f"source={baseline_result.get('data_source', '')}"
+        )
+        await manager.broadcast({"type": "system", "data": {"msg": msg}})
     initial_capital = float(capital) if capital is not None else float(cfg.get("system.initial_capital", 1000000.0) or 1000000.0)
     
     cab = BacktestCabinet(

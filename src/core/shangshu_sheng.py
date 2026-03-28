@@ -21,6 +21,75 @@ class ShangshuSheng:
         if pd.isna(x):
             return ""
         return x.strftime("%Y-%m-%d")
+
+    def _ensure_lots(self, pos):
+        lots = pos.get('lots')
+        if isinstance(lots, list):
+            normalized = []
+            for item in lots:
+                if not isinstance(item, dict):
+                    continue
+                q = int(item.get('qty', 0) or 0)
+                if q <= 0:
+                    continue
+                normalized.append({
+                    'qty': q,
+                    'buy_day': str(item.get('buy_day', '')).strip(),
+                    'unit_cost': float(item.get('unit_cost', pos.get('avg_price', 0.0)) or 0.0)
+                })
+            pos['lots'] = normalized
+            return pos['lots']
+        legacy_qty = int(pos.get('qty', 0) or 0)
+        if legacy_qty <= 0:
+            pos['lots'] = []
+            return pos['lots']
+        pos['lots'] = [{
+            'qty': legacy_qty,
+            'buy_day': str(pos.get('last_buy_day', '')).strip(),
+            'unit_cost': float(pos.get('avg_price', 0.0) or 0.0)
+        }]
+        return pos['lots']
+
+    def _rebuild_position_from_lots(self, pos, mark_price):
+        lots = self._ensure_lots(pos)
+        total_qty = sum(int(x.get('qty', 0) or 0) for x in lots)
+        if total_qty <= 0:
+            pos['qty'] = 0
+            pos['avg_price'] = 0.0
+            pos['market_value'] = 0.0
+            pos['last_buy_day'] = ''
+            return
+        total_cost = sum(float(x.get('unit_cost', 0.0) or 0.0) * int(x.get('qty', 0) or 0) for x in lots)
+        pos['qty'] = total_qty
+        pos['avg_price'] = total_cost / total_qty
+        pos['market_value'] = float(mark_price) * total_qty
+        buy_days = sorted([str(x.get('buy_day', '')).strip() for x in lots if str(x.get('buy_day', '')).strip()])
+        pos['last_buy_day'] = buy_days[-1] if buy_days else ''
+
+    def _sellable_qty_t1(self, pos, curr_day):
+        lots = self._ensure_lots(pos)
+        return sum(int(x.get('qty', 0) or 0) for x in lots if str(x.get('buy_day', '')).strip() != str(curr_day or '').strip())
+
+    def _consume_lots_fifo(self, pos, sell_qty, curr_day):
+        lots = self._ensure_lots(pos)
+        need = int(sell_qty or 0)
+        consumed = []
+        for lot in lots:
+            if need <= 0:
+                break
+            lot_day = str(lot.get('buy_day', '')).strip()
+            if lot_day == str(curr_day or '').strip():
+                continue
+            can_take = min(int(lot.get('qty', 0) or 0), need)
+            if can_take <= 0:
+                continue
+            lot['qty'] = int(lot.get('qty', 0) or 0) - can_take
+            consumed.append({'qty': can_take, 'unit_cost': float(lot.get('unit_cost', 0.0) or 0.0)})
+            need -= can_take
+        if need > 0:
+            return None
+        pos['lots'] = [x for x in lots if int(x.get('qty', 0) or 0) > 0]
+        return consumed
         
     def execute_order(self, strategy_id, signal, kline, hu_bu_account=None):
         """
@@ -87,19 +156,18 @@ class ShangshuSheng:
                     'market_value': 0.0,
                     'direction': 'BUY', # Default to Long
                     'stop_loss': signal.get('stop_loss'),
-                    'take_profit': signal.get('take_profit')
+                    'take_profit': signal.get('take_profit'),
+                    'lots': []
                 }
             
             pos = self.positions[strategy_id][code]
-            new_qty = pos['qty'] + qty
-            new_avg = (pos['avg_price'] * pos['qty'] + fill_price * qty + cost) / new_qty # Include cost in avg price? Usually cost is separate. Let's keep cost separate for PnL.
-            # Standard avg price calculation: (old_val + new_val) / new_qty
-            new_avg = (pos['avg_price'] * pos['qty'] + fill_price * qty) / new_qty
-            
-            pos['qty'] = new_qty
-            pos['avg_price'] = new_avg
-            pos['market_value'] = new_qty * fill_price # Mark to market immediately
-            pos['last_buy_day'] = self._trade_day(kline.get('dt'))
+            lots = self._ensure_lots(pos)
+            lots.append({
+                'qty': qty,
+                'buy_day': self._trade_day(kline.get('dt')),
+                'unit_cost': float(fill_price)
+            })
+            self._rebuild_position_from_lots(pos, fill_price)
             
             hu_bu.record_transaction(strategy_id, kline['dt'], 'BUY', fill_price, qty, cost)
 
@@ -116,21 +184,22 @@ class ShangshuSheng:
             if qty % lot_size != 0 and qty != pos_qty:
                 self.xing_bu.record_rejection(strategy_id, 'EXEC_LOT_BLOCK', f"SELL qty must be lot-sized or equal to full position ({pos_qty})", kline['dt'])
                 return False
-            buy_day = str(pos.get('last_buy_day', '')).strip()
             curr_day = self._trade_day(kline.get('dt'))
-            if buy_day and curr_day and buy_day == curr_day:
-                self.xing_bu.record_rejection(strategy_id, 'EXEC_T1_BLOCK', f"T+1 block: {code} bought today cannot be sold", kline['dt'])
+            sellable_qty = self._sellable_qty_t1(pos, curr_day)
+            if qty > sellable_qty:
+                self.xing_bu.record_rejection(strategy_id, 'EXEC_T1_BLOCK', f"T+1 block: {code} sellable {sellable_qty} < request {qty}", kline['dt'])
                 return False
+            consumed = self._consume_lots_fifo(pos, qty, curr_day)
+            if consumed is None:
+                self.xing_bu.record_rejection(strategy_id, 'EXEC_T1_BLOCK', f"T+1 block: {code} insufficient sellable lots", kline['dt'])
+                return False
+            cost_basis = sum(float(x.get('unit_cost', 0.0) or 0.0) * int(x.get('qty', 0) or 0) for x in consumed)
             
             # Calculate Realized PnL
-            # (Sell Price - Avg Buy Price) * Qty - Cost
-            pnl = (fill_price - pos['avg_price']) * qty - cost
-            
-            pos['qty'] -= qty
-            if pos['qty'] == 0:
+            pnl = (fill_price * qty) - cost_basis - cost
+            self._rebuild_position_from_lots(pos, fill_price)
+            if int(pos.get('qty', 0) or 0) == 0:
                 del self.positions[strategy_id][code]
-            else:
-                pos['market_value'] = pos['qty'] * fill_price
 
             hu_bu.record_transaction(strategy_id, kline['dt'], 'SELL', fill_price, qty, cost, pnl)
             
@@ -169,9 +238,9 @@ class ShangshuSheng:
         for strategy_id, stocks in self.positions.items():
             if code in stocks:
                 pos = stocks[code]
-                buy_day = str(pos.get('last_buy_day', '')).strip()
                 curr_day = self._trade_day(kline.get('dt'))
-                if buy_day and curr_day and buy_day == curr_day:
+                sellable_qty = self._sellable_qty_t1(pos, curr_day)
+                if sellable_qty <= 0:
                     continue
                 triggered, type_, price = self.bing_bu.check_stop_orders(pos, kline)
                 
@@ -182,7 +251,7 @@ class ShangshuSheng:
                         'code': code,
                         'dt': kline['dt'], # Triggered at this time
                         'direction': 'SELL',
-                        'qty': pos['qty'], # Close all for simplicity
+                        'qty': sellable_qty,
                         'price': price, # Trigger price
                         'type': 'MARKET' # Execute immediately
                     }

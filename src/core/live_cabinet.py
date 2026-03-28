@@ -19,11 +19,13 @@ import asyncio
 from src.utils.tushare_provider import TushareProvider
 from src.utils.akshare_provider import AkshareProvider
 from src.utils.indicators import Indicators
+from src.utils.config_loader import ConfigLoader
 
 class LiveCabinet:
     def __init__(self, stock_code, initial_capital=1000000.0, provider_type='default', tushare_token=None, event_callback=None):
         self.stock_code = stock_code
         self.event_callback = event_callback # Callback for UI updates
+        self.config = ConfigLoader.reload()
         
         if provider_type == 'tushare':
             self.provider = TushareProvider(token=tushare_token)
@@ -62,6 +64,7 @@ class LiveCabinet:
         self.daily_data_buffer = [] # Buffer for daily data
         self.today_archived = False
         self.peak_fund_value = float(initial_capital)
+        self._live_alert_last = {}
 
     def warm_up(self):
         """
@@ -107,6 +110,144 @@ class LiveCabinet:
         """
         if self.event_callback:
             await self.event_callback(event_type, data)
+
+    def _live_cfg(self, path, default=None):
+        cfg = ConfigLoader.reload()
+        return cfg.get(path, default)
+
+    def _level_of(self, value, warn, critical):
+        v = float(value or 0.0)
+        w = float(warn or 0.0)
+        c = float(critical or 0.0)
+        if c > 0 and v >= c:
+            return "critical"
+        if w > 0 and v >= w:
+            return "warn"
+        return "ok"
+
+    async def _emit_live_alert(self, metric, value, warn, critical, current_dt, extra=None):
+        level = self._level_of(value, warn, critical)
+        prev = self._live_alert_last.get(metric)
+        self._live_alert_last[metric] = level
+        if level == "ok":
+            return
+        if prev == level:
+            return
+        payload = {
+            "time": current_dt.strftime("%H:%M:%S"),
+            "metric": metric,
+            "level": level,
+            "value": float(value),
+            "warn": float(warn),
+            "critical": float(critical)
+        }
+        if isinstance(extra, dict):
+            payload.update(extra)
+        await self._emit_event("live_alert", payload)
+        badge = "bg-trading-yellow" if level == "warn" else "bg-trading-red"
+        await self._emit_event("menxia", {
+            "msg": f"实盘监控告警: {metric}={float(value):.6f}",
+            "details": f"> 等级: {level}<br>> 当前值: {float(value):.6f}<br>> warn: {float(warn):.6f}<br>> critical: {float(critical):.6f}",
+            "status": badge,
+            "decision": "alert",
+            "metric": metric,
+            "level": level
+        })
+
+    def _today_turnover_ratio(self, current_dt, fund_value_now):
+        if float(fund_value_now or 0.0) <= 0:
+            return 0.0
+        total = 0.0
+        for tx in self.revenue.transactions:
+            dt_val = pd.to_datetime(tx.get("dt"), errors="coerce")
+            if pd.isna(dt_val):
+                continue
+            if dt_val.date() != current_dt.date():
+                continue
+            total += float(tx.get("amount", 0.0) or 0.0)
+        return total / float(fund_value_now)
+
+    def _live_lot_snapshot(self, current_dt):
+        curr_day = pd.to_datetime(current_dt, errors="coerce")
+        curr_day_text = "" if pd.isna(curr_day) else curr_day.strftime("%Y-%m-%d")
+        target_code = str(self.stock_code or "").upper()
+        rows = []
+        total_qty = 0
+        sellable_qty = 0
+        for strategy_id, stocks in self.state_affairs.positions.items():
+            if not isinstance(stocks, dict):
+                continue
+            for code, pos in stocks.items():
+                code_text = str(code or "").upper()
+                if code_text != target_code:
+                    continue
+                lots = pos.get("lots")
+                if not isinstance(lots, list) or not lots:
+                    qty_legacy = int(pos.get("qty", 0) or 0)
+                    if qty_legacy <= 0:
+                        continue
+                    lots = [{
+                        "qty": qty_legacy,
+                        "buy_day": str(pos.get("last_buy_day", "")).strip(),
+                        "unit_cost": float(pos.get("avg_price", 0.0) or 0.0)
+                    }]
+                for lot in lots:
+                    lot_qty = int(lot.get("qty", 0) or 0)
+                    if lot_qty <= 0:
+                        continue
+                    buy_day = str(lot.get("buy_day", "")).strip()
+                    can_sell = lot_qty if (buy_day and buy_day != curr_day_text) else 0
+                    total_qty += lot_qty
+                    sellable_qty += can_sell
+                    rows.append({
+                        "strategy_id": str(strategy_id),
+                        "code": code_text,
+                        "buy_day": buy_day or "--",
+                        "qty": lot_qty,
+                        "sellable_qty": can_sell,
+                        "locked_qty": lot_qty - can_sell,
+                        "unit_cost": float(lot.get("unit_cost", 0.0) or 0.0)
+                    })
+        rows.sort(key=lambda x: (x["strategy_id"], x["buy_day"], x["qty"]))
+        return {
+            "time": curr_day.strftime("%H:%M:%S") if not pd.isna(curr_day) else "--",
+            "total_qty": int(total_qty),
+            "sellable_qty": int(sellable_qty),
+            "locked_qty": int(max(0, total_qty - sellable_qty)),
+            "rows": rows
+        }
+
+    async def _check_live_monitor_alerts(self, current_dt, fund_value_now, holdings_value_now, api_latency_ms, signal_consistency):
+        dd_warn = float(self._live_cfg("live_monitoring.risk_alerts.daily_drawdown_warn", 0.02))
+        dd_critical = float(self._live_cfg("live_monitoring.risk_alerts.daily_drawdown_critical", 0.03))
+        pos_warn = float(self._live_cfg("live_monitoring.risk_alerts.single_position_weight_warn", 0.15))
+        pos_critical = float(self._live_cfg("live_monitoring.risk_alerts.single_position_weight_critical", 0.2))
+        turnover_warn = float(self._live_cfg("live_monitoring.risk_alerts.turnover_rate_warn", 0.5))
+        turnover_critical = float(self._live_cfg("live_monitoring.risk_alerts.turnover_rate_critical", 0.8))
+        delay_warn_s = float(self._live_cfg("live_monitoring.consistency_checks.signal_execution_delay_seconds_warn", 5))
+        delay_critical_s = float(self._live_cfg("live_monitoring.consistency_checks.signal_execution_delay_seconds_critical", 15))
+        delay_warn_ms = delay_warn_s * 1000.0
+        delay_critical_ms = delay_critical_s * 1000.0
+        self.peak_fund_value = max(float(self.peak_fund_value), float(fund_value_now))
+        drawdown = 0.0
+        if self.peak_fund_value > 0:
+            drawdown = max(0.0, (float(self.peak_fund_value) - float(fund_value_now)) / float(self.peak_fund_value))
+        pos_weight = 0.0
+        if float(fund_value_now) > 0:
+            pos_weight = float(holdings_value_now) / float(fund_value_now)
+        turnover_ratio = self._today_turnover_ratio(current_dt, fund_value_now)
+        await self._emit_live_alert("daily_drawdown", drawdown, dd_warn, dd_critical, current_dt)
+        await self._emit_live_alert("single_position_weight", pos_weight, pos_warn, pos_critical, current_dt)
+        await self._emit_live_alert("turnover_rate", turnover_ratio, turnover_warn, turnover_critical, current_dt)
+        await self._emit_live_alert("signal_execution_delay_ms", float(api_latency_ms), delay_warn_ms, delay_critical_ms, current_dt)
+        await self._emit_event("live_monitor_snapshot", {
+            "time": current_dt.strftime("%H:%M:%S"),
+            "daily_drawdown": round(drawdown, 6),
+            "single_position_weight": round(pos_weight, 6),
+            "turnover_rate": round(turnover_ratio, 6),
+            "signal_consistency": round(float(signal_consistency), 2),
+            "api_latency_ms": int(api_latency_ms)
+        })
 
     async def run_live(self):
         """
@@ -333,6 +474,13 @@ class LiveCabinet:
             'signal_consistency': round(signal_consistency, 2),
             'api_latency_ms': api_latency_ms
         })
+        await self._check_live_monitor_alerts(
+            current_dt=current_dt,
+            fund_value_now=fund_value_now,
+            holdings_value_now=holdings_value_now,
+            api_latency_ms=api_latency_ms,
+            signal_consistency=signal_consistency
+        )
         
         if not active_signals:
             print("   💤 无策略信号")
@@ -397,8 +545,23 @@ class LiveCabinet:
                         'direction': signal.get('direction'),
                         'price': float(signal.get('price', 0.0)),
                         'qty': int(signal.get('qty', 0)),
-                        'realized_pnl': realized_pnl
+                        'realized_pnl': realized_pnl,
+                        'expected_price': float(signal.get('price', 0.0)),
+                        'actual_price': float(bar.get('close', 0.0))
                     })
+                    expected_price = float(signal.get('price', 0.0) or 0.0)
+                    actual_price = float(bar.get('close', 0.0) or 0.0)
+                    deviation = 0.0 if expected_price <= 0 else abs(actual_price - expected_price) / expected_price
+                    dev_warn = float(self._live_cfg("live_monitoring.consistency_checks.expected_vs_actual_price_deviation_warn", 0.003))
+                    dev_critical = float(self._live_cfg("live_monitoring.consistency_checks.expected_vs_actual_price_deviation_critical", 0.008))
+                    await self._emit_live_alert(
+                        "expected_vs_actual_price_deviation",
+                        deviation,
+                        dev_warn,
+                        dev_critical,
+                        current_dt,
+                        extra={"strategy_id": strategy_id}
+                    )
                     
                     await self._emit_event('shangshu', {
                     'msg': f"执行成功! 持仓: {new_qty}",
@@ -446,6 +609,7 @@ class LiveCabinet:
                 'qty': int(order.get('qty', 0)),
                 'realized_pnl': realized_pnl
             })
+        await self._emit_event('live_position_lots', self._live_lot_snapshot(current_dt))
 
     def _check_market_close(self, current_dt):
         # Archive at 15:00

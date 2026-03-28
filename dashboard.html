@@ -584,6 +584,51 @@
                         <div id="live-trigger-summary" class="font-mono text-[11px] text-cyan-300 bg-slate-900/60 border border-slate-700 rounded p-2 mb-2">--</div>
                         <div class="text-[11px] text-slate-300 mb-1">本周期策略列表</div>
                         <div id="live-strategy-summary" class="font-mono text-[11px] text-emerald-300 bg-slate-900/60 border border-slate-700 rounded p-2">--</div>
+                        <div class="mt-3 grid grid-cols-2 gap-2">
+                            <div class="bg-slate-900/60 border border-slate-700 rounded p-2">
+                                <div class="text-[10px] text-slate-400">当日回撤</div>
+                                <div id="live-mon-dd" class="text-[12px] font-mono text-emerald-300">0.000%</div>
+                            </div>
+                            <div class="bg-slate-900/60 border border-slate-700 rounded p-2">
+                                <div class="text-[10px] text-slate-400">单票仓位</div>
+                                <div id="live-mon-pos" class="text-[12px] font-mono text-cyan-300">0.000%</div>
+                            </div>
+                            <div class="bg-slate-900/60 border border-slate-700 rounded p-2">
+                                <div class="text-[10px] text-slate-400">当日换手率</div>
+                                <div id="live-mon-turnover" class="text-[12px] font-mono text-cyan-300">0.000%</div>
+                            </div>
+                            <div class="bg-slate-900/60 border border-slate-700 rounded p-2">
+                                <div class="text-[10px] text-slate-400">执行延迟</div>
+                                <div id="live-mon-latency" class="text-[12px] font-mono text-slate-200">-- ms</div>
+                            </div>
+                        </div>
+                        <div class="mt-2 bg-slate-900/60 border border-slate-700 rounded p-2">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="text-[10px] text-slate-400 uppercase tracking-wider">最近告警</div>
+                                <div class="flex items-center gap-1">
+                                    <select id="live-alert-filter" onchange="onLiveAlertFilterChange(this.value)" class="bg-slate-800 border border-slate-600 text-slate-200 rounded px-1 py-0.5 text-[10px]">
+                                        <option value="all">全部</option>
+                                        <option value="daily_drawdown">当日回撤</option>
+                                        <option value="single_position_weight">单票仓位</option>
+                                        <option value="turnover_rate">当日换手率</option>
+                                        <option value="signal_execution_delay_ms">执行延迟</option>
+                                        <option value="expected_vs_actual_price_deviation">成交偏差</option>
+                                    </select>
+                                    <button onclick="clearLiveAlerts()" class="text-[10px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-100 border border-slate-500">清空</button>
+                                    <span id="live-alert-badge" class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-200">正常</span>
+                                </div>
+                            </div>
+                            <div id="live-alert-list" class="max-h-24 overflow-y-auto space-y-1 text-[10px] font-mono text-slate-300">
+                                <div class="text-slate-500">暂无告警</div>
+                            </div>
+                        </div>
+                        <div class="mt-2 bg-slate-900/60 border border-slate-700 rounded p-2">
+                            <div class="text-[10px] text-slate-400 uppercase tracking-wider mb-1">批次明细（T+1解锁）</div>
+                            <div id="live-lot-summary" class="text-[10px] text-slate-300 font-mono mb-1">总持仓 -- 手 | 可卖 -- 手 | 冻结 -- 手</div>
+                            <div id="live-lot-list" class="max-h-24 overflow-y-auto space-y-1 text-[10px] font-mono text-slate-300">
+                                <div class="text-slate-500">暂无持仓批次</div>
+                            </div>
+                        </div>
                         <div class="text-[10px] text-slate-500 mt-2">周期对照：1min=1分钟，5min=5分钟，10min=10分钟，15min=15分钟，30min=30分钟，60min=60分钟，D=日线</div>
                     </div>
                     <div id="live-stream-panel" class="glass-panel flex-1 min-h-0 rounded-lg p-0 overflow-hidden flex flex-col">
@@ -1127,6 +1172,16 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             riskApproved: 0,
             riskRejected: 0,
             riskRejects: [],
+            liveAlerts: [],
+            liveAlertSeq: 0,
+            liveAlertFilter: 'all',
+            liveMonitor: {
+                daily_drawdown: 0,
+                single_position_weight: 0,
+                turnover_rate: 0,
+                signal_consistency: 50,
+                api_latency_ms: null
+            },
             recentPnls: [],
             confidenceSeries: {
                 consistency: [],
@@ -1579,6 +1634,15 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     BT_STATE.totalTrades += 1;
                     pulsePanel('panel-bing');
                     break;
+                case 'live_alert':
+                    renderLiveAlert(data);
+                    break;
+                case 'live_monitor_snapshot':
+                    renderLiveMonitorSnapshot(data);
+                    break;
+                case 'live_position_lots':
+                    renderLivePositionLots(data);
+                    break;
                 case 'backtest_progress':
                     updateBacktestProgress(data);
                     refreshKlineModalImage(false, data.current_date || null);
@@ -2000,6 +2064,171 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             const list = document.getElementById('live-strategy-summary');
             if (trigger) trigger.innerText = `[${data.time || '--'}] ${formatTriggerSummaryZh(data.trigger_summary || '--')}`;
             if (list) list.innerText = data.strategy_summary || '--';
+        }
+
+        function formatLiveMetricLabel(metric) {
+            const m = {
+                daily_drawdown: '当日回撤',
+                single_position_weight: '单票仓位',
+                turnover_rate: '当日换手率',
+                signal_execution_delay_ms: '执行延迟',
+                expected_vs_actual_price_deviation: '成交偏差'
+            };
+            return m[String(metric || '')] || String(metric || '--');
+        }
+
+        function formatLiveMetricValue(metric, value) {
+            const v = Number(value || 0);
+            const key = String(metric || '');
+            if (key.includes('delay_ms')) return `${v.toFixed(0)} ms`;
+            if (key.includes('deviation') || key.includes('drawdown') || key.includes('weight') || key.includes('turnover')) return `${(v * 100).toFixed(3)}%`;
+            return String(v);
+        }
+
+        function alertBadgeByLevel(level) {
+            if (level === 'critical') return { text: '严重', cls: 'text-[10px] px-2 py-0.5 rounded bg-rose-700 text-white' };
+            if (level === 'warn') return { text: '预警', cls: 'text-[10px] px-2 py-0.5 rounded bg-amber-700 text-white' };
+            return { text: '正常', cls: 'text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-200' };
+        }
+
+        function renderRecentLiveAlerts() {
+            const list = document.getElementById('live-alert-list');
+            const badge = document.getElementById('live-alert-badge');
+            const filterSel = document.getElementById('live-alert-filter');
+            if (!list || !badge) return;
+            if (filterSel && filterSel.value !== DIAG_STATE.liveAlertFilter) {
+                filterSel.value = DIAG_STATE.liveAlertFilter;
+            }
+            const alerts = Array.isArray(DIAG_STATE.liveAlerts) ? DIAG_STATE.liveAlerts : [];
+            const filtered = alerts.filter(x => DIAG_STATE.liveAlertFilter === 'all' || String(x.metric || '') === DIAG_STATE.liveAlertFilter);
+            const sorted = filtered.slice().sort((a, b) => {
+                const pa = a.level === 'critical' ? 0 : (a.level === 'warn' ? 1 : 2);
+                const pb = b.level === 'critical' ? 0 : (b.level === 'warn' ? 1 : 2);
+                if (pa !== pb) return pa - pb;
+                return Number(b.seq || 0) - Number(a.seq || 0);
+            });
+            const top = sorted[0];
+            const b = alertBadgeByLevel(top?.level || 'ok');
+            badge.className = b.cls;
+            badge.innerText = b.text;
+            if (!sorted.length) {
+                list.innerHTML = '<div class="text-slate-500">暂无告警</div>';
+                return;
+            }
+            list.innerHTML = '';
+            sorted.slice(0, 8).forEach(item => {
+                const row = document.createElement('div');
+                const level = String(item.level || 'ok');
+                row.className = level === 'critical'
+                    ? 'text-rose-300 animate-pulse border border-rose-500/50 rounded px-1 py-0.5'
+                    : (level === 'warn' ? 'text-amber-300' : 'text-slate-300');
+                const t = String(item.time || getTime());
+                const metric = formatLiveMetricLabel(item.metric);
+                const value = formatLiveMetricValue(item.metric, item.value);
+                row.innerText = `[${t}] ${level.toUpperCase()} ${metric}: ${value}`;
+                list.appendChild(row);
+            });
+        }
+
+        function onLiveAlertFilterChange(value) {
+            DIAG_STATE.liveAlertFilter = String(value || 'all');
+            renderRecentLiveAlerts();
+        }
+
+        function clearLiveAlerts() {
+            DIAG_STATE.liveAlerts = [];
+            renderRecentLiveAlerts();
+            logMessage('风控中心', '最近告警列表已清空', 'system');
+        }
+
+        function renderLiveAlert(data) {
+            const level = String(data?.level || 'ok');
+            const metric = String(data?.metric || '--');
+            const value = Number(data?.value || 0);
+            DIAG_STATE.liveAlerts.unshift({
+                seq: ++DIAG_STATE.liveAlertSeq,
+                time: data?.time || getTime(),
+                level,
+                metric,
+                value
+            });
+            DIAG_STATE.liveAlerts = DIAG_STATE.liveAlerts.slice(0, 20);
+            renderRecentLiveAlerts();
+            const statusMenxia = document.getElementById('status-menxia');
+            if (statusMenxia) {
+                if (level === 'critical') statusMenxia.className = 'status-dot bg-trading-red shadow-[0_0_8px_currentColor] animate-pulse';
+                if (level === 'warn') statusMenxia.className = 'status-dot bg-trading-yellow shadow-[0_0_8px_currentColor]';
+            }
+            const txt = `${formatLiveMetricLabel(metric)} ${formatLiveMetricValue(metric, value)}`;
+            logMessage('风控中心', `实盘告警(${level.toUpperCase()}): ${txt}`, level === 'critical' ? 'danger' : 'warning');
+            pulsePanel('panel-xing');
+        }
+
+        function renderLiveMonitorSnapshot(data) {
+            DIAG_STATE.liveMonitor = {
+                daily_drawdown: Number(data?.daily_drawdown || 0),
+                single_position_weight: Number(data?.single_position_weight || 0),
+                turnover_rate: Number(data?.turnover_rate || 0),
+                signal_consistency: Number(data?.signal_consistency ?? DIAG_STATE.signalConsistency),
+                api_latency_ms: Number(data?.api_latency_ms ?? DIAG_STATE.apiLatencyMs ?? 0)
+            };
+            DIAG_STATE.signalConsistency = DIAG_STATE.liveMonitor.signal_consistency;
+            DIAG_STATE.apiLatencyMs = DIAG_STATE.liveMonitor.api_latency_ms;
+            const ddEl = document.getElementById('live-mon-dd');
+            const posEl = document.getElementById('live-mon-pos');
+            const turnoverEl = document.getElementById('live-mon-turnover');
+            const latencyEl = document.getElementById('live-mon-latency');
+            if (ddEl) {
+                ddEl.innerText = `${(DIAG_STATE.liveMonitor.daily_drawdown * 100).toFixed(3)}%`;
+                ddEl.className = DIAG_STATE.liveMonitor.daily_drawdown >= 0.03 ? 'text-[12px] font-mono text-rose-300' : (DIAG_STATE.liveMonitor.daily_drawdown >= 0.02 ? 'text-[12px] font-mono text-amber-300' : 'text-[12px] font-mono text-emerald-300');
+            }
+            if (posEl) {
+                posEl.innerText = `${(DIAG_STATE.liveMonitor.single_position_weight * 100).toFixed(3)}%`;
+                posEl.className = DIAG_STATE.liveMonitor.single_position_weight >= 0.2 ? 'text-[12px] font-mono text-rose-300' : (DIAG_STATE.liveMonitor.single_position_weight >= 0.15 ? 'text-[12px] font-mono text-amber-300' : 'text-[12px] font-mono text-cyan-300');
+            }
+            if (turnoverEl) {
+                turnoverEl.innerText = `${(DIAG_STATE.liveMonitor.turnover_rate * 100).toFixed(3)}%`;
+                turnoverEl.className = DIAG_STATE.liveMonitor.turnover_rate >= 0.8 ? 'text-[12px] font-mono text-rose-300' : (DIAG_STATE.liveMonitor.turnover_rate >= 0.5 ? 'text-[12px] font-mono text-amber-300' : 'text-[12px] font-mono text-cyan-300');
+            }
+            if (latencyEl) {
+                latencyEl.innerText = `${Math.round(DIAG_STATE.liveMonitor.api_latency_ms)} ms`;
+                latencyEl.className = DIAG_STATE.liveMonitor.api_latency_ms >= 15000 ? 'text-[12px] font-mono text-rose-300' : (DIAG_STATE.liveMonitor.api_latency_ms >= 5000 ? 'text-[12px] font-mono text-amber-300' : 'text-[12px] font-mono text-slate-200');
+            }
+            updateDebugPanel();
+            updateConfidenceScore();
+        }
+
+        function renderLivePositionLots(data) {
+            const summary = document.getElementById('live-lot-summary');
+            const list = document.getElementById('live-lot-list');
+            if (!summary || !list) return;
+            const totalQty = Number(data?.total_qty || 0);
+            const sellableQty = Number(data?.sellable_qty || 0);
+            const lockedQty = Number(data?.locked_qty || 0);
+            const totalLot = totalQty / 100;
+            const sellableLot = sellableQty / 100;
+            const lockedLot = lockedQty / 100;
+            const timeText = String(data?.time || '--');
+            summary.innerText = `[${timeText}] 总持仓 ${totalLot.toFixed(0)} 手 | 可卖 ${sellableLot.toFixed(0)} 手 | 冻结 ${lockedLot.toFixed(0)} 手`;
+            const rows = Array.isArray(data?.rows) ? data.rows : [];
+            if (!rows.length) {
+                list.innerHTML = '<div class="text-slate-500">暂无持仓批次</div>';
+                return;
+            }
+            list.innerHTML = '';
+            rows.forEach(r => {
+                const row = document.createElement('div');
+                const sellable = Number(r?.sellable_qty || 0);
+                const qty = Number(r?.qty || 0);
+                const locked = Number(r?.locked_qty || 0);
+                const strategyId = String(r?.strategy_id || '--');
+                const buyDay = String(r?.buy_day || '--');
+                const unitCost = Number(r?.unit_cost || 0);
+                const color = sellable > 0 ? 'text-emerald-300' : 'text-amber-300';
+                row.className = `${color} border border-slate-700/70 rounded px-1 py-0.5`;
+                row.innerText = `S${strategyId} | 买入日 ${buyDay} | 持仓 ${(qty/100).toFixed(0)}手 | 可卖 ${(sellable/100).toFixed(0)}手 | 冻结 ${(locked/100).toFixed(0)}手 | 成本 ${unitCost.toFixed(3)}`;
+                list.appendChild(row);
+            });
         }
 
         function toggleDebugPanel() {
