@@ -252,6 +252,20 @@ def 归一状态(v: str) -> str:
     return 状态别名.get(raw, raw)
 
 
+def 规范日期(v: str) -> Tuple[bool, str]:
+    raw = str(v or "").strip()
+    if not raw:
+        return False, ""
+    text = raw.replace(".", "-").replace("/", "-")
+    for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(text, fmt)
+            return True, dt.strftime("%Y-%m-%d")
+        except Exception:
+            continue
+    return False, raw
+
+
 def 构建映射(列定义: List[Tuple[str, str]], 英文别名: List[str]) -> Dict[str, str]:
     映射 = {}
     for idx, (中文, 内部) in enumerate(列定义):
@@ -518,6 +532,19 @@ def 单任务执行(task: Dict[str, Any], base_url: str, poll_seconds: int, stat
             "error_msg": "数据源必须为default",
             "result_row": None,
         }
+    ok_start, start_date_norm = 规范日期(start_date)
+    ok_end, end_date_norm = 规范日期(end_date)
+    if not ok_start or not ok_end:
+        return {
+            "task_id": task_id,
+            "ok": False,
+            "status": "failed",
+            "report_id": "",
+            "error_msg": f"日期格式不合法，要求YYYY-MM-DD，当前 start={start_date} end={end_date}",
+            "result_row": None,
+        }
+    start_date = start_date_norm
+    end_date = end_date_norm
     attempts = 0
     while attempts <= max_retry:
         attempts += 1
