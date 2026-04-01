@@ -321,6 +321,10 @@ class MysqlProvider:
     def fetch_daily_data(self, code, start_time, end_time):
         return self._query_range(code, start_time, end_time, "D")
 
+    def fetch_kline_data_strict(self, code, start_time, end_time, interval="1min"):
+        iv = str(interval or "1min")
+        return self._query_range(code, start_time, end_time, iv)
+
     def fetch_kline_data(self, code, start_time, end_time, interval="1min"):
         iv = str(interval or "1min")
         if iv == "1min":

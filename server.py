@@ -744,6 +744,11 @@ class HistorySyncRunRequest(BaseModel):
     tables: Optional[list[str]] = None
     start_time: Optional[str] = None
     end_time: Optional[str] = None
+    time_mode: Optional[str] = None
+    custom_start_time: Optional[str] = None
+    custom_end_time: Optional[str] = None
+    session_only: Optional[bool] = None
+    intraday_mode: Optional[bool] = None
     lookback_days: int = 10
     max_codes: int = 10000
     batch_size: int = 500
@@ -756,6 +761,11 @@ class HistorySyncRunRequest(BaseModel):
 class HistorySyncScheduleRequest(BaseModel):
     interval_minutes: int = 60
     lookback_days: int = 10
+    time_mode: Optional[str] = None
+    custom_start_time: Optional[str] = None
+    custom_end_time: Optional[str] = None
+    session_only: Optional[bool] = None
+    intraday_mode: Optional[bool] = None
     max_codes: int = 10000
     batch_size: int = 500
     tables: Optional[list[str]] = None
@@ -2202,6 +2212,11 @@ def _history_sync_payload_from_request(req: HistorySyncRunRequest):
         "tables": req.tables,
         "start_time": req.start_time,
         "end_time": req.end_time,
+        "time_mode": str(req.time_mode or cfg.get("history_sync.time_mode", "lookback") or "lookback"),
+        "custom_start_time": req.custom_start_time or cfg.get("history_sync.custom_start_time", None),
+        "custom_end_time": req.custom_end_time or cfg.get("history_sync.custom_end_time", None),
+        "session_only": bool(req.session_only) if req.session_only is not None else bool(cfg.get("history_sync.session_only", True)),
+        "intraday_mode": bool(req.intraday_mode) if req.intraday_mode is not None else bool(cfg.get("history_sync.intraday_mode", False)),
         "lookback_days": max(1, int(req.lookback_days or 1)),
         "max_codes": max(1, int(req.max_codes or 1)),
         "batch_size": max(1, int(req.batch_size or 1)),
@@ -2225,6 +2240,11 @@ async def _history_sync_scheduler_loop():
             "tables": cfg.get("history_sync.tables", list(DEFAULT_SYNC_TABLES)),
             "start_time": cfg.get("history_sync.start_time", None),
             "end_time": cfg.get("history_sync.end_time", None),
+            "time_mode": str(cfg.get("history_sync.time_mode", "lookback") or "lookback"),
+            "custom_start_time": cfg.get("history_sync.custom_start_time", None),
+            "custom_end_time": cfg.get("history_sync.custom_end_time", None),
+            "session_only": bool(cfg.get("history_sync.session_only", True)),
+            "intraday_mode": bool(cfg.get("history_sync.intraday_mode", False)),
             "lookback_days": max(1, int(cfg.get("history_sync.lookback_days", 10) or 10)),
             "max_codes": max(1, int(cfg.get("history_sync.max_codes", 10000) or 10000)),
             "batch_size": max(1, int(cfg.get("history_sync.batch_size", 500) or 500)),
@@ -2255,6 +2275,11 @@ async def api_history_sync_status():
         "scheduler_running": history_sync_scheduler_task is not None and not history_sync_scheduler_task.done(),
     }
 
+@app.post("/api/history_sync/stop")
+async def api_history_sync_stop():
+    result = await asyncio.to_thread(history_sync_service.request_stop)
+    return {"status": "success", **result}
+
 @app.get("/api/history_sync/records")
 async def api_history_sync_records(limit: int = 20, offset: int = 0):
     data = await asyncio.to_thread(history_sync_service.list_records, limit, offset)
@@ -2274,6 +2299,17 @@ async def api_history_sync_scheduler_start(req: HistorySyncScheduleRequest):
     cfg.set("history_sync.scheduler_enabled", True)
     cfg.set("history_sync.interval_minutes", max(1, int(req.interval_minutes or 1)))
     cfg.set("history_sync.lookback_days", max(1, int(req.lookback_days or 1)))
+    cfg.set("history_sync.time_mode", str(req.time_mode or cfg.get("history_sync.time_mode", "lookback") or "lookback"))
+    cfg.set("history_sync.custom_start_time", req.custom_start_time if req.custom_start_time is not None else cfg.get("history_sync.custom_start_time", None))
+    cfg.set("history_sync.custom_end_time", req.custom_end_time if req.custom_end_time is not None else cfg.get("history_sync.custom_end_time", None))
+    cfg.set(
+        "history_sync.session_only",
+        bool(req.session_only) if req.session_only is not None else bool(cfg.get("history_sync.session_only", True)),
+    )
+    cfg.set(
+        "history_sync.intraday_mode",
+        bool(req.intraday_mode) if req.intraday_mode is not None else bool(cfg.get("history_sync.intraday_mode", False)),
+    )
     cfg.set("history_sync.max_codes", max(1, int(req.max_codes or 1)))
     cfg.set("history_sync.batch_size", max(1, int(req.batch_size or 1)))
     cfg.set("history_sync.tables", req.tables if req.tables else list(DEFAULT_SYNC_TABLES))

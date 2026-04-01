@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 import threading
 from datetime import datetime, timedelta
 from typing import Any, Optional
@@ -12,6 +13,8 @@ from src.utils.indicators import Indicators
 from src.utils.tushare_provider import TushareProvider
 from src.utils.mysql_provider import MysqlProvider
 from src.utils.postgres_provider import PostgresProvider
+
+logger = logging.getLogger("HistorySyncService")
 
 
 TABLE_INTERVAL_MAP = {
@@ -39,6 +42,7 @@ class HistoryDiffSyncService:
     def __init__(self):
         self._run_lock = threading.Lock()
         self._is_running = False
+        self._stop_requested = False
         self._last_report: dict[str, Any] = {}
         self._last_record: dict[str, Any] = {}
         self._records_dir = os.path.join("reports", "history_sync")
@@ -46,14 +50,22 @@ class HistoryDiffSyncService:
     def get_status(self) -> dict[str, Any]:
         return {
             "is_running": self._is_running,
+            "stop_requested": self._stop_requested,
             "last_report": self._last_report,
             "last_record": self._last_record,
         }
+
+    def request_stop(self) -> dict[str, Any]:
+        if not self._is_running:
+            return {"status": "idle", "msg": "no running sync task"}
+        self._stop_requested = True
+        return {"status": "success", "msg": "stop requested"}
 
     def run_sync(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not self._run_lock.acquire(blocking=False):
             return {"status": "busy", "msg": "sync task is already running", "report": self._last_report}
         self._is_running = True
+        self._stop_requested = False
         started_at = datetime.now()
         normalized_payload = payload or {}
         try:
@@ -62,6 +74,21 @@ class HistoryDiffSyncService:
             report["finished_at"] = datetime.now().isoformat(timespec="seconds")
             self._last_report = report
             result = {"status": "success", "report": report}
+            record = self._persist_run_record(payload=normalized_payload, result=result)
+            result["record"] = record
+            self._last_record = record
+            return result
+        except RuntimeError as e:
+            msg = str(e)
+            stopped = "sync stopped by user" in msg
+            report = {
+                "status": "stopped" if stopped else "failed",
+                "error": msg,
+                "started_at": started_at.isoformat(timespec="seconds"),
+                "finished_at": datetime.now().isoformat(timespec="seconds"),
+            }
+            self._last_report = report
+            result = {"status": "stopped" if stopped else "error", "msg": msg, "report": report}
             record = self._persist_run_record(payload=normalized_payload, result=result)
             result["record"] = record
             self._last_record = record
@@ -81,6 +108,7 @@ class HistoryDiffSyncService:
             return result
         finally:
             self._is_running = False
+            self._stop_requested = False
             self._run_lock.release()
 
     def list_records(self, limit: int = 20, offset: int = 0) -> dict[str, Any]:
@@ -207,14 +235,20 @@ class HistoryDiffSyncService:
         lookback_days = int(payload.get("lookback_days", 10) or 10)
         max_codes = int(payload.get("max_codes", 10000) or 10000)
         batch_size = int(payload.get("batch_size", 500) or 500)
-        dry_run = bool(payload.get("dry_run", False))
+        dry_run = self._as_bool(payload.get("dry_run", False), False)
         on_duplicate = str(payload.get("on_duplicate", "ignore") or "ignore")
-        start_time = self._parse_datetime(payload.get("start_time"))
-        end_time = self._parse_datetime(payload.get("end_time"))
-        if end_time is None:
-            end_time = datetime.now()
-        if start_time is None:
-            start_time = end_time - timedelta(days=lookback_days)
+        time_mode = str(payload.get("time_mode", cfg.get("history_sync.time_mode", "lookback")) or "lookback").strip().lower()
+        if time_mode not in {"lookback", "custom"}:
+            time_mode = "lookback"
+        intraday_mode = self._as_bool(payload.get("intraday_mode", cfg.get("history_sync.intraday_mode", False)), False)
+        session_only = self._as_bool(payload.get("session_only", cfg.get("history_sync.session_only", True)), True)
+        start_time, end_time = self._resolve_time_range(
+            payload=payload,
+            cfg=cfg,
+            lookback_days=lookback_days,
+            time_mode=time_mode,
+            intraday_mode=intraday_mode,
+        )
         if start_time >= end_time:
             raise RuntimeError("start_time must be earlier than end_time")
 
@@ -234,6 +268,11 @@ class HistoryDiffSyncService:
         provider = TushareProvider(token=tushare_token)
         session = requests.Session() if write_mode == "api" else None
         target_db_provider = self._build_target_db_provider(write_mode=write_mode, direct_db_source=direct_db_source)
+        self._ensure_target_db_ready(
+            write_mode=write_mode,
+            provider=target_db_provider,
+            sample_code=codes[0],
+        )
 
         summary = {
             "codes_total": len(codes),
@@ -241,6 +280,8 @@ class HistoryDiffSyncService:
             "dry_run": dry_run,
             "write_mode": write_mode,
             "direct_db_source": direct_db_source if write_mode == "direct_db" else "",
+            "time_mode": time_mode,
+            "session_only": session_only,
             "start_time": start_time.isoformat(timespec="seconds"),
             "end_time": end_time.isoformat(timespec="seconds"),
             "total_source_rows": 0,
@@ -249,11 +290,22 @@ class HistoryDiffSyncService:
             "total_written_rows": 0,
             "code_reports": [],
         }
+        logger.info(
+            f"history sync run started: codes={len(codes)} tables={tables} write_mode={write_mode} dry_run={dry_run}"
+        )
 
         for code in codes:
-            source_frames = self._build_source_frames(provider, code, start_time, end_time, tables)
+            self._check_stop_requested(context=f"before code {code}")
+            self._ensure_target_db_ready(
+                write_mode=write_mode,
+                provider=target_db_provider,
+                sample_code=code,
+            )
+            logger.info(f"history sync processing code={code}")
+            source_frames = self._build_source_frames(provider, code, start_time, end_time, tables, session_only=session_only)
             code_report = {"code": code, "tables": []}
             for table in tables:
+                self._check_stop_requested(context=f"before table {table} code {code}")
                 source_df = source_frames.get(table)
                 if source_df is None or source_df.empty:
                     code_report["tables"].append(
@@ -289,6 +341,12 @@ class HistoryDiffSyncService:
                 missing_mask = ~source_keys.isin(existing_keys)
                 missing_df = source_df.loc[missing_mask].copy()
                 written_rows = 0
+                if not missing_df.empty:
+                    preview = self._build_write_preview(table=table, df=missing_df)
+                    logger.info(
+                        f"history sync write preview code={code} table={table} mode={write_mode} "
+                        f"rows={len(missing_df)} preview={preview}"
+                    )
                 if not dry_run and not missing_df.empty:
                     if write_mode == "api":
                         rows = missing_df.to_dict("records")
@@ -314,13 +372,34 @@ class HistoryDiffSyncService:
                     "missing_rows": int(len(missing_df)),
                     "written_rows": int(written_rows),
                 }
+                logger.info(
+                    f"history sync code={code} table={table} source={table_report['source_rows']} "
+                    f"existing={table_report['existing_rows']} missing={table_report['missing_rows']} "
+                    f"written={table_report['written_rows']} dry_run={dry_run}"
+                )
+                if not dry_run and not missing_df.empty:
+                    logger.info(
+                        f"history sync write result code={code} table={table} "
+                        f"requested={len(missing_df)} written={written_rows}"
+                    )
                 code_report["tables"].append(table_report)
                 summary["total_source_rows"] += table_report["source_rows"]
                 summary["total_existing_rows"] += table_report["existing_rows"]
                 summary["total_missing_rows"] += table_report["missing_rows"]
                 summary["total_written_rows"] += table_report["written_rows"]
             summary["code_reports"].append(code_report)
+        logger.info(
+            f"history sync run finished: total_source={summary['total_source_rows']} "
+            f"total_existing={summary['total_existing_rows']} total_missing={summary['total_missing_rows']} "
+            f"total_written={summary['total_written_rows']}"
+        )
         return summary
+
+    def _check_stop_requested(self, context: str = "") -> None:
+        if not self._stop_requested:
+            return
+        text = str(context or "").strip()
+        raise RuntimeError(f"sync stopped by user{(' at ' + text) if text else ''}")
 
     def _build_target_db_provider(self, write_mode: str, direct_db_source: str):
         if write_mode != "direct_db":
@@ -330,6 +409,17 @@ class HistoryDiffSyncService:
         if direct_db_source == "postgresql":
             return PostgresProvider()
         raise RuntimeError("unsupported direct_db_source")
+
+    def _ensure_target_db_ready(self, write_mode: str, provider: Any, sample_code: str) -> None:
+        if write_mode != "direct_db":
+            return
+        if provider is None:
+            raise RuntimeError("direct_db provider not initialized")
+        if not hasattr(provider, "check_connectivity"):
+            return
+        ok, msg = provider.check_connectivity(sample_code)
+        if not ok:
+            raise RuntimeError(f"direct_db precheck failed: {msg}")
 
     def _extract_time_keys_from_df(self, df: pd.DataFrame, is_day: bool) -> set[str]:
         if df is None or df.empty:
@@ -367,9 +457,15 @@ class HistoryDiffSyncService:
             return set()
         interval = TABLE_INTERVAL_MAP.get(table, "1min")
         try:
-            df = provider.fetch_kline_data(code, start_time, end_time, interval=interval)
+            if hasattr(provider, "fetch_kline_data_strict"):
+                df = provider.fetch_kline_data_strict(code, start_time, end_time, interval=interval)
+            else:
+                df = provider.fetch_kline_data(code, start_time, end_time, interval=interval)
         except Exception as e:
             raise RuntimeError(f"query direct_db existing rows failed table={table} code={code}: {e}")
+        provider_err = str(getattr(provider, "last_error", "") or "").strip()
+        if provider_err:
+            raise RuntimeError(f"query direct_db existing rows failed table={table} code={code}: {provider_err}")
         return self._extract_time_keys_from_df(df, is_day=(table == "dat_days"))
 
     def _build_direct_db_upsert_df(self, table: str, df: pd.DataFrame) -> pd.DataFrame:
@@ -380,6 +476,27 @@ class HistoryDiffSyncService:
             if "trade_time" not in out.columns and "date" in out.columns:
                 out["trade_time"] = pd.to_datetime(out["date"], errors="coerce")
         return out
+
+    def _build_write_preview(self, table: str, df: pd.DataFrame) -> dict[str, Any]:
+        if df is None or df.empty:
+            return {"rows": 0}
+        key_col = "date" if table == "dat_days" else "trade_time"
+        if key_col not in df.columns:
+            return {"rows": int(len(df))}
+        work = df.copy()
+        if table == "dat_days":
+            keys = pd.to_datetime(work[key_col], errors="coerce")
+            keys = keys.dropna().dt.strftime("%Y-%m-%d")
+        else:
+            keys = pd.to_datetime(work[key_col], errors="coerce")
+            keys = keys.dropna().dt.strftime("%Y-%m-%d %H:%M:%S")
+        if keys.empty:
+            return {"rows": int(len(df))}
+        return {
+            "rows": int(len(df)),
+            "from": str(keys.iloc[0]),
+            "to": str(keys.iloc[-1]),
+        }
 
     def _parse_datetime(self, value: Any) -> Optional[datetime]:
         if value is None:
@@ -400,6 +517,59 @@ class HistoryDiffSyncService:
             except Exception:
                 continue
         raise RuntimeError(f"invalid datetime: {value}")
+
+    def _as_bool(self, value: Any, default: bool) -> bool:
+        if value is None:
+            return bool(default)
+        if isinstance(value, bool):
+            return value
+        text = str(value).strip().lower()
+        if text in {"1", "true", "yes", "y", "on"}:
+            return True
+        if text in {"0", "false", "no", "n", "off"}:
+            return False
+        return bool(default)
+
+    def _resolve_time_range(
+        self,
+        payload: dict[str, Any],
+        cfg: ConfigLoader,
+        lookback_days: int,
+        time_mode: str,
+        intraday_mode: bool,
+    ) -> tuple[datetime, datetime]:
+        start_time = self._parse_datetime(payload.get("start_time"))
+        end_time = self._parse_datetime(payload.get("end_time"))
+        if start_time is not None or end_time is not None:
+            end_time = end_time or datetime.now()
+            start_time = start_time or (end_time - timedelta(days=lookback_days))
+            return start_time, end_time
+        if time_mode == "custom":
+            custom_start = payload.get("custom_start_time", cfg.get("history_sync.custom_start_time", None))
+            custom_end = payload.get("custom_end_time", cfg.get("history_sync.custom_end_time", None))
+            start_time = self._parse_datetime(custom_start)
+            end_time = self._parse_datetime(custom_end)
+            if start_time is None or end_time is None:
+                raise RuntimeError("history_sync custom mode requires custom_start_time and custom_end_time")
+            return start_time, end_time
+        if intraday_mode:
+            return self._default_intraday_window()
+        end_time = datetime.now()
+        start_time = end_time - timedelta(days=lookback_days)
+        return start_time, end_time
+
+    def _default_intraday_window(self) -> tuple[datetime, datetime]:
+        now = datetime.now()
+        start_today = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        end_today = now.replace(hour=15, minute=0, second=0, microsecond=0)
+        if now < start_today:
+            prev = now - timedelta(days=1)
+            start_prev = prev.replace(hour=9, minute=30, second=0, microsecond=0)
+            end_prev = prev.replace(hour=15, minute=0, second=0, microsecond=0)
+            return start_prev, end_prev
+        if now >= end_today:
+            return start_today, end_today
+        return start_today, now
 
     def _normalize_code(self, code: str) -> str:
         c = str(code or "").strip().upper()
@@ -552,12 +722,15 @@ class HistoryDiffSyncService:
         start_time: datetime,
         end_time: datetime,
         tables: list[str],
+        session_only: bool = True,
     ) -> dict[str, pd.DataFrame]:
         frames: dict[str, pd.DataFrame] = {}
         minute_tables = [t for t in tables if t != "dat_days"]
         source_by_interval: dict[str, pd.DataFrame] = {}
+        self._check_stop_requested(context=f"build source start code {code}")
         if minute_tables:
             base_df = provider.fetch_minute_data(code, start_time, end_time)
+            self._check_stop_requested(context=f"after minute fetch code {code}")
             if base_df is not None and not base_df.empty:
                 df = base_df.copy()
                 if "dt" not in df.columns and "trade_time" in df.columns:
@@ -573,6 +746,8 @@ class HistoryDiffSyncService:
                     df["vol"] = pd.to_numeric(df["vol"], errors="coerce")
                     df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
                     df = df.dropna(subset=["open", "high", "low", "close"])
+                    if session_only:
+                        df = self._filter_session_minutes(df)
                     df["code"] = code
                     if not df.empty:
                         source_by_interval["1min"] = df
@@ -583,8 +758,10 @@ class HistoryDiffSyncService:
                             source_by_interval[interval] = Indicators.resample(df.copy(), interval)
                             source_by_interval[interval]["code"] = code
         for table in tables:
+            self._check_stop_requested(context=f"build source table {table} code {code}")
             if table == "dat_days":
                 day_df = provider.fetch_daily_data(code, start_time, end_time)
+                self._check_stop_requested(context=f"after daily fetch code {code}")
                 if day_df is None or day_df.empty:
                     frames[table] = pd.DataFrame()
                     continue
@@ -680,6 +857,17 @@ class HistoryDiffSyncService:
             frames[table] = out_df.reset_index(drop=True)
         return frames
 
+    def _filter_session_minutes(self, df: pd.DataFrame) -> pd.DataFrame:
+        if df is None or df.empty or "dt" not in df.columns:
+            return pd.DataFrame() if df is None else df
+        work = df.copy()
+        work["dt"] = pd.to_datetime(work["dt"], errors="coerce")
+        work = work.dropna(subset=["dt"])
+        minutes = work["dt"].dt.hour * 60 + work["dt"].dt.minute
+        mask = (minutes >= 9 * 60 + 30) & (minutes <= 15 * 60)
+        work = work.loc[mask].copy()
+        return work.reset_index(drop=True)
+
     def _fetch_existing_keys(
         self,
         session: requests.Session,
@@ -748,6 +936,7 @@ class HistoryDiffSyncService:
                 offset = 0
                 ok = True
                 while True:
+                    self._check_stop_requested(context=f"query existing table {table} code {code}")
                     params = {
                         "limit": limit,
                         "offset": offset,
@@ -791,6 +980,7 @@ class HistoryDiffSyncService:
         written = 0
         api_tables = self._resolve_api_table_candidates(table)
         for i in range(0, len(rows), batch_size):
+            self._check_stop_requested(context=f"push rows table {table}")
             batch = self._sanitize_rows_for_post(table=table, rows=rows[i:i + batch_size])
             if not batch:
                 continue

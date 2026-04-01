@@ -22,13 +22,13 @@
   "data_provider": {
     "source": "mysql",
     "enable_fallback": false,
-    "tushare_token": "4ba065ecb8eebdebc93dffaef6bc051eeb3a98b46eb7d94fd697282f",
-    "default_api_key": "abc123",
+    "tushare_token": "",
+    "default_api_key": "",
     "default_api_url": "",
     "mysql_host": "127.0.0.1",
     "mysql_port": 3306,
     "mysql_user": "root",
-    "mysql_password": "123456",
+    "mysql_password": "",
     "mysql_database": "quantifydata",
     "mysql_charset": "utf8mb4",
     "mysql_pool_size": 6,
@@ -71,7 +71,12 @@
   "history_sync": {
     "scheduler_enabled": false,
     "interval_minutes": 60,
-    "lookback_days": 10,
+    "time_mode": "custom",
+    "lookback_days": 20,
+    "custom_start_time": "2026-03-01 09:30:00",
+    "custom_end_time": "2026-03-31 15:00:00",
+    "session_only": true,
+    "intraday_mode": false,
     "max_codes": 10000,
     "batch_size": 500,
     "tables": [
@@ -121,7 +126,7 @@
   },
   "trading_cost": {
     "commission_rate": 0.00025,
-    "min_commission": 5.0,
+    "min_commission": 5,
     "stamp_duty": 0.001,
     "transfer_fee": 0
   },

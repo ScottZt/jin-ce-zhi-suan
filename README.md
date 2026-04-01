@@ -248,6 +248,56 @@ python server.py
 - 直连数据库模式下，目标库由 `history_sync.direct_db_source` 指定，可选 `mysql` / `postgresql`。
 - PostgreSQL 落库使用 `ON CONFLICT (code, trade_time)`，目标表需具备 `(code, trade_time)` 唯一约束。
 - MySQL 落库使用 `ON DUPLICATE KEY UPDATE`，目标表需具备可触发冲突更新的唯一键（建议 `(code, trade_time)`）。
+- 增量同步时间窗口新增两种模式：`history_sync.time_mode=lookback`（按 `lookback_days` 回看最近 N 天）与 `history_sync.time_mode=custom`（使用 `custom_start_time/custom_end_time` 固定区间）。
+- 当请求或配置中显式传入 `start_time/end_time` 时，优先使用显式时间，`time_mode` 仅在未显式传时间时生效。
+- `history_sync.intraday_mode=true` 时，未显式传时间将使用“当日（或最近交易日）09:30:00~15:00:00”窗口；默认建议关闭，仅在盘中补数场景启用。
+- `history_sync.session_only=true`（默认）时，分钟线源数据会过滤为交易时段 `09:30:00~15:00:00`，避免写入非交易分钟。
+
+#### 增量同步时间配置示例
+
+```json
+"history_sync": {
+  "time_mode": "lookback",
+  "lookback_days": 20,
+  "custom_start_time": "",
+  "custom_end_time": "",
+  "session_only": true,
+  "intraday_mode": false
+}
+```
+
+- 最近 N 天模式：`time_mode=lookback` + `lookback_days=N`
+- 自定义区间模式：`time_mode=custom` + `custom_start_time=YYYY-MM-DD HH:MM:SS` + `custom_end_time=YYYY-MM-DD HH:MM:SS`
+- API `/api/history_sync/run` 与 `/api/history_sync/scheduler/start` 同步支持上述字段：`time_mode/custom_start_time/custom_end_time/session_only/intraday_mode`
+
+#### 自定义开始/结束时间窗模板写法
+
+- 固定格式：`YYYY-MM-DD HH:MM:SS`
+- 推荐边界：开始时间写 `09:30:00`，结束时间写 `15:00:00`
+- 生效前提：`time_mode` 必须是 `custom`
+- 优先级：若同时传了 `start_time/end_time`，则以 `start_time/end_time` 为准
+
+```json
+"history_sync": {
+  "time_mode": "custom",
+  "custom_start_time": "2026-03-01 09:30:00",
+  "custom_end_time": "2026-03-31 15:00:00",
+  "session_only": true,
+  "intraday_mode": false
+}
+```
+
+接口请求体模板：
+
+```json
+{
+  "time_mode": "custom",
+  "custom_start_time": "2026-03-01 09:30:00",
+  "custom_end_time": "2026-03-31 15:00:00",
+  "session_only": true,
+  "intraday_mode": false
+}
+```
 
 #### 历史数据源表结构参照
 

@@ -1090,6 +1090,7 @@
         let backtestResultRecovered = false;
         let historySyncRunning = false;
         let historySyncSchedulerRunning = false;
+        let historySyncStopRequested = false;
         let strategyManagerRows = [];
         let strategyManagerDetailId = null;
         let strategyManagerEditingId = null;
@@ -2411,10 +2412,15 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 fields: [
                     { path: 'history_sync.write_mode', label: '写入模式', type: 'select', options: [{ value: 'api', label: 'api（写default_api_url）' }, { value: 'direct_db', label: 'direct_db（直连数据库）' }] },
                     { path: 'history_sync.direct_db_source', label: '直连数据库源', type: 'select', options: [{ value: 'mysql', label: 'mysql' }, { value: 'postgresql', label: 'postgresql' }] },
+                    { path: 'history_sync.time_mode', label: '时间模式', type: 'select', options: [{ value: 'lookback', label: 'lookback（最近N天）' }, { value: 'custom', label: 'custom（自定义区间）' }] },
                     { path: 'history_sync.lookback_days', label: '默认回看天数', type: 'number', min: 1, max: 3650, step: 1, slider: true },
+                    { path: 'history_sync.custom_start_time', label: '自定义开始时间', type: 'text', placeholder: '例如：2026-03-01 09:30:00', desc: '格式：YYYY-MM-DD HH:MM:SS；time_mode=custom时生效' },
+                    { path: 'history_sync.custom_end_time', label: '自定义结束时间', type: 'text', placeholder: '例如：2026-03-31 15:00:00', desc: '格式：YYYY-MM-DD HH:MM:SS；time_mode=custom时生效' },
+                    { path: 'history_sync.session_only', label: '仅交易时段(09:30-15:00)', type: 'boolean' },
+                    { path: 'history_sync.intraday_mode', label: '盘中窗口模式', type: 'boolean' },
                     { path: 'history_sync.max_codes', label: '默认标的上限', type: 'number', min: 1, max: 50000, step: 1, slider: true },
                     { path: 'history_sync.batch_size', label: '默认分批条数', type: 'number', min: 1, max: 5000, step: 1, slider: true },
-                    { path: 'history_sync.dry_run', label: '默认Dry Run', type: 'boolean' }
+                    { path: 'history_sync.dry_run', label: '默认仅预演（不写库）', type: 'boolean', desc: '开启=只统计缺失与预计写入，不执行落库；关闭=真实写入数据库' }
                 ]
             },
             {
@@ -2764,6 +2770,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     input.max = field.max !== undefined ? String(field.max) : undefined;
                     input.step = field.type === 'number' ? String(field.step ?? 'any') : undefined;
                     input.value = String(value ?? field.default ?? '');
+                    if (field.placeholder) input.placeholder = String(field.placeholder);
                     input.dataset.path = field.path;
                     input.dataset.kind = 'value';
                     input.dataset.valueType = field.type === 'number' ? 'number' : 'string';
@@ -2812,6 +2819,10 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                         <button id="history-sync-run-btn" onclick="runHistorySync()" class="bg-teal-700 hover:bg-teal-600 text-white px-3 py-1.5 rounded text-xs border border-teal-500">
                             <i id="history-sync-run-icon" class="fa-solid fa-database"></i>
                             <span id="history-sync-run-label">增量同步</span>
+                        </button>
+                        <button id="history-sync-stop-btn" onclick="stopHistorySync()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-xs border border-slate-500">
+                            <i id="history-sync-stop-icon" class="fa-solid fa-stop"></i>
+                            <span id="history-sync-stop-label">停止同步</span>
                         </button>
                         <button id="history-sync-scheduler-btn" onclick="toggleHistorySyncScheduler()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-xs border border-slate-500">
                             <i id="history-sync-scheduler-icon" class="fa-solid fa-clock"></i>
@@ -3633,6 +3644,9 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             const runBtn = document.getElementById('history-sync-run-btn');
             const runIcon = document.getElementById('history-sync-run-icon');
             const runLabel = document.getElementById('history-sync-run-label');
+            const stopBtn = document.getElementById('history-sync-stop-btn');
+            const stopIcon = document.getElementById('history-sync-stop-icon');
+            const stopLabel = document.getElementById('history-sync-stop-label');
             const schedulerBtn = document.getElementById('history-sync-scheduler-btn');
             const schedulerIcon = document.getElementById('history-sync-scheduler-icon');
             const schedulerLabel = document.getElementById('history-sync-scheduler-label');
@@ -3640,11 +3654,24 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 if (historySyncRunning) {
                     runBtn.className = 'bg-amber-700 hover:bg-amber-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-amber-500 min-w-[128px]';
                     runIcon.className = 'fa-solid fa-spinner';
-                    runLabel.innerText = '同步进行中';
+                    runLabel.innerText = historySyncStopRequested ? '停止中' : '同步进行中';
                 } else {
                     runBtn.className = 'bg-teal-700 hover:bg-teal-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-teal-500 min-w-[128px]';
                     runIcon.className = 'fa-solid fa-database';
                     runLabel.innerText = '增量同步';
+                }
+            }
+            if (stopBtn && stopIcon && stopLabel) {
+                if (historySyncRunning) {
+                    stopBtn.className = 'bg-rose-700 hover:bg-rose-600 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-rose-500 min-w-[128px]';
+                    stopIcon.className = historySyncStopRequested ? 'fa-solid fa-spinner' : 'fa-solid fa-stop';
+                    stopLabel.innerText = historySyncStopRequested ? '停止中' : '停止同步';
+                    stopBtn.disabled = !!historySyncStopRequested;
+                } else {
+                    stopBtn.className = 'bg-slate-700 text-slate-300 px-4 py-2 rounded font-bold text-sm transition-all border border-slate-500 min-w-[128px] opacity-60 cursor-not-allowed';
+                    stopIcon.className = 'fa-solid fa-stop';
+                    stopLabel.innerText = '停止同步';
+                    stopBtn.disabled = true;
                 }
             }
             if (schedulerBtn && schedulerIcon && schedulerLabel) {
@@ -3666,6 +3693,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 if (!res.ok) return;
                 const data = await res.json();
                 historySyncRunning = Boolean(data?.service?.is_running);
+                historySyncStopRequested = Boolean(data?.service?.stop_requested);
                 historySyncSchedulerRunning = Boolean(data?.scheduler_running);
                 renderHistorySyncButtons();
             } catch (_) {}
@@ -3673,15 +3701,21 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
 
         async function runHistorySync() {
             if (historySyncRunning) {
-                logMessage('SYSTEM', '增量同步任务已在运行中', 'warning');
+                logMessage('SYSTEM', '增量同步任务已在运行中，请点击“停止同步”按钮中断', 'warning');
                 return;
             }
             historySyncRunning = true;
+            historySyncStopRequested = false;
             renderHistorySyncButtons();
             try {
                 const cfg = configDraft || {};
                 const writeMode = String(getByPath(cfg, 'history_sync.write_mode', 'api') || 'api');
                 const directDbSource = String(getByPath(cfg, 'history_sync.direct_db_source', 'mysql') || 'mysql');
+                const timeMode = String(getByPath(cfg, 'history_sync.time_mode', 'lookback') || 'lookback');
+                const customStartTime = String(getByPath(cfg, 'history_sync.custom_start_time', '') || '').trim();
+                const customEndTime = String(getByPath(cfg, 'history_sync.custom_end_time', '') || '').trim();
+                const sessionOnly = Boolean(getByPath(cfg, 'history_sync.session_only', true));
+                const intradayMode = Boolean(getByPath(cfg, 'history_sync.intraday_mode', false));
                 const lookbackDays = Number(getByPath(cfg, 'history_sync.lookback_days', 10) || 10);
                 const maxCodes = Number(getByPath(cfg, 'history_sync.max_codes', 10000) || 10000);
                 const batchSize = Number(getByPath(cfg, 'history_sync.batch_size', 500) || 500);
@@ -3694,6 +3728,11 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     batch_size: Math.max(1, Math.floor(batchSize)),
                     tables,
                     dry_run: dryRun,
+                    time_mode: timeMode,
+                    custom_start_time: customStartTime,
+                    custom_end_time: customEndTime,
+                    session_only: sessionOnly,
+                    intraday_mode: intradayMode,
                     on_duplicate: 'ignore',
                     write_mode: writeMode,
                     direct_db_source: directDbSource,
@@ -3711,12 +3750,31 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 const report = data.report || {};
                 const missing = Number(report.total_missing_rows || 0);
                 const written = Number(report.total_written_rows || 0);
-                logMessage('SYSTEM', `增量同步完成：缺失${missing}条，写入${written}条`, 'success');
+                if (dryRun) {
+                    logMessage('SYSTEM', `增量同步预演完成：缺失${missing}条，预计写入${missing}条（未落库）`, 'warning');
+                } else {
+                    logMessage('SYSTEM', `增量同步完成：缺失${missing}条，写入${written}条`, 'success');
+                }
                 if (data.record && data.record.run_id) {
                     logMessage('SYSTEM', `同步记录已生成：${data.record.run_id}`, 'info');
                 }
             } catch (e) {
                 logMessage('SYSTEM', `增量同步失败: ${e}`, 'danger');
+            } finally {
+                await refreshHistorySyncStatus();
+            }
+        }
+
+        async function stopHistorySync() {
+            try {
+                const res = await fetch('/api/history_sync/stop', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.msg || '停止失败');
+                historySyncStopRequested = true;
+                renderHistorySyncButtons();
+                logMessage('SYSTEM', `增量同步停止请求已发送：${data.msg || 'ok'}，等待当前批次结束后中断`, 'warning');
+            } catch (e) {
+                logMessage('SYSTEM', `停止增量同步失败: ${e}`, 'danger');
             } finally {
                 await refreshHistorySyncStatus();
             }
@@ -3729,6 +3787,11 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     const cfg = configDraft || {};
                     const writeMode = String(getByPath(cfg, 'history_sync.write_mode', 'api') || 'api');
                     const directDbSource = String(getByPath(cfg, 'history_sync.direct_db_source', 'mysql') || 'mysql');
+                    const timeMode = String(getByPath(cfg, 'history_sync.time_mode', 'lookback') || 'lookback');
+                    const customStartTime = String(getByPath(cfg, 'history_sync.custom_start_time', '') || '').trim();
+                    const customEndTime = String(getByPath(cfg, 'history_sync.custom_end_time', '') || '').trim();
+                    const sessionOnly = Boolean(getByPath(cfg, 'history_sync.session_only', true));
+                    const intradayMode = Boolean(getByPath(cfg, 'history_sync.intraday_mode', false));
                     const lookbackDays = Number(getByPath(cfg, 'history_sync.lookback_days', 10) || 10);
                     const maxCodes = Number(getByPath(cfg, 'history_sync.max_codes', 10000) || 10000);
                     const batchSize = Number(getByPath(cfg, 'history_sync.batch_size', 500) || 500);
@@ -3746,6 +3809,11 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                             batch_size: Math.max(1, Math.floor(batchSize)),
                             tables,
                             dry_run: dryRun,
+                            time_mode: timeMode,
+                            custom_start_time: customStartTime,
+                            custom_end_time: customEndTime,
+                            session_only: sessionOnly,
+                            intraday_mode: intradayMode,
                             on_duplicate: 'ignore',
                             write_mode: writeMode,
                             direct_db_source: directDbSource
