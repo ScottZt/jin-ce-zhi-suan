@@ -10,11 +10,14 @@ __pycache__/
 config.private.json
 reports/
 .env
-.env.*
+.env.*WWWW
 data/reports/
 data/history/
+data/live_fund_pool/
 backtest_report.html
 双仓库推送指南.md
 数据接口系统的操作手册.md
 server.log
 USER_GUIDE.md
+scripts/replay_live_fastforward.py
+config.json

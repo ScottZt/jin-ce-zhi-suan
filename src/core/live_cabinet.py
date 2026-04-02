@@ -162,6 +162,18 @@ class LiveCabinet:
             })
         realized_pnl = float(sum(float(x.get("pnl", 0.0) or 0.0) for x in tx_all if str(x.get("direction", "")).upper() == "SELL"))
         total_cost = float(sum(float(x.get("cost", 0.0) or 0.0) for x in tx_all))
+        today_rt_cache_bars = 0
+        today_rt_cache_last_dt = ""
+        provider_last_error = str(getattr(self.provider, "last_error", "") or "")
+        stats_fn = getattr(self.provider, "get_today_rt_cache_stats", None)
+        if callable(stats_fn):
+            try:
+                rt_stats = stats_fn(self.stock_code)
+                if isinstance(rt_stats, dict):
+                    today_rt_cache_bars = int(rt_stats.get("bars", 0) or 0)
+                    today_rt_cache_last_dt = str(rt_stats.get("last_dt", "") or "")
+            except Exception:
+                pass
         return {
             "stock_code": str(self.stock_code or "").upper(),
             "updated_at": datetime.now().isoformat(timespec="seconds"),
@@ -180,7 +192,10 @@ class LiveCabinet:
                 "total_stamp_duty": round(float(self.revenue.total_stamp_duty or 0.0), 4),
                 "total_transfer_fee": round(float(self.revenue.total_transfer_fee or 0.0), 4)
             },
-            "peak_fund_value": round(float(self.peak_fund_value or 0.0), 4)
+            "peak_fund_value": round(float(self.peak_fund_value or 0.0), 4),
+            "today_rt_cache_bars": today_rt_cache_bars,
+            "today_rt_cache_last_dt": today_rt_cache_last_dt,
+            "provider_last_error": provider_last_error
         }
 
     def _persist_virtual_fund_pool(self):
@@ -959,7 +974,12 @@ class LiveCabinet:
                 except Exception as e:
                     print(f"❌ 实盘tick异常: {e}")
                     await self._emit_event('system', {'msg': f'实盘tick异常: {e}', 'stock': self.stock_code})
-                await asyncio.sleep(3) # Faster tick for demo (3s)
+                replay_speed = float(os.getenv("OPENCLAW_TUSHARE_REPLAY_SPEED", "0") or 0.0)
+                if str(self.provider_type).lower() == "tushare" and replay_speed > 0:
+                    sleep_seconds = 1
+                else:
+                    sleep_seconds = 7 if str(self.provider_type).lower() == "tushare" else 3
+                await asyncio.sleep(sleep_seconds)
         except asyncio.CancelledError:
             print("\n🛑 实时监控任务已取消。")
         except KeyboardInterrupt:

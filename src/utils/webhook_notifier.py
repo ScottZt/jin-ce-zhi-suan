@@ -110,8 +110,19 @@ class WebhookNotifier:
                 f"内容: {str(data)}"
             ])
         strategy_id = str(data.get("strategy_id", "") or "")
+        strategy_name_raw = str(data.get("strategy_name", "") or "").strip()
+        strategy_name = self._normalize_strategy_display_name(
+            strategy_name_raw if strategy_name_raw else strategy_id
+        ) if strategy_id or strategy_name_raw else ""
         direction = str(data.get("direction", "") or "").upper()
         direction_label = dir_label_map.get(direction, direction)
+        qty_val = self._to_float(data.get("qty", None))
+        hands_val = None if qty_val is None else (qty_val / 100.0)
+        price_val = self._to_float(data.get("price", None))
+        amount_val = self._to_float(data.get("amount", None))
+        if amount_val is None and (price_val is not None) and (qty_val is not None):
+            amount_val = float(price_val) * float(qty_val)
+        fee_est = self._estimate_fee(direction, amount_val)
         level = str(data.get("level", "") or "").lower()
         level_label = level_label_map.get(level, "")
         metric = str(data.get("metric", "") or "")
@@ -139,12 +150,21 @@ class WebhookNotifier:
             lines.append(f"信号时间: {event_time}")
         if strategy_id:
             lines.append(f"策略ID: {strategy_id}")
+        if strategy_name:
+            lines.append(f"策略: {strategy_name}")
         if direction_label:
             lines.append(f"方向: {direction_label}")
         if data.get("price") is not None:
             lines.append(f"价格: {data.get('price')}")
         if data.get("qty") is not None:
             lines.append(f"数量: {data.get('qty')}")
+        if hands_val is not None:
+            lines.append(f"手数: {hands_val:.2f}手")
+        if amount_val is not None:
+            amount_label = "买入金额" if direction == "BUY" else ("卖出金额" if direction == "SELL" else "成交金额")
+            lines.append(f"{amount_label}: {self._fmt_amount(amount_val)}")
+        if fee_est is not None:
+            lines.append(f"预估手续费: {self._fmt_amount(fee_est.get('total'))}")
         if metric_label:
             lines.append(f"监控指标: {metric_label}")
         if level_label:
@@ -179,6 +199,14 @@ class WebhookNotifier:
             x for x in lines if str(x or "").strip()
         ]
         return "\n".join(lines)
+
+    def _allow_feishu_event(self, event_type, data):
+        if str(event_type or "") != "trade_exec":
+            return False
+        if not isinstance(data, dict):
+            return False
+        direction = str(data.get("direction", "") or "").upper()
+        return direction in {"BUY", "SELL"}
 
     def _feishu_sign(self, secret):
         ts = str(int(time.time()))
@@ -288,6 +316,32 @@ class WebhookNotifier:
             return v * 100.0
         return v
 
+    def _fmt_amount(self, value):
+        v = self._to_float(value)
+        if v is None:
+            return ""
+        return f"{float(v):,.2f}"
+
+    def _estimate_fee(self, direction, amount):
+        amt = self._to_float(amount)
+        if amt is None or amt <= 0:
+            return None
+        cfg = ConfigLoader.reload()
+        commission_rate = float(cfg.get("trading_cost.commission_rate", 0.0) or 0.0)
+        min_commission = float(cfg.get("trading_cost.min_commission", 0.0) or 0.0)
+        stamp_duty_rate = float(cfg.get("trading_cost.stamp_duty", 0.0) or 0.0)
+        transfer_fee_rate = float(cfg.get("trading_cost.transfer_fee", 0.0) or 0.0)
+        commission = max(float(min_commission), float(amt) * float(commission_rate)) if commission_rate > 0 else float(min_commission)
+        stamp_duty = float(amt) * float(stamp_duty_rate) if str(direction or "").upper() == "SELL" else 0.0
+        transfer_fee = float(amt) * float(transfer_fee_rate) if transfer_fee_rate > 0 else 0.0
+        total = float(commission) + float(stamp_duty) + float(transfer_fee)
+        return {
+            "total": total,
+            "commission": commission,
+            "stamp_duty": stamp_duty,
+            "transfer_fee": transfer_fee
+        }
+
     def _progress_bar(self, percent, width=12):
         p = self._to_percent_number(percent)
         if p is None:
@@ -339,8 +393,19 @@ class WebhookNotifier:
                 }
             }
         strategy_id = str(data.get("strategy_id", "") or "")
+        strategy_name_raw = str(data.get("strategy_name", "") or "").strip()
+        strategy_name = self._normalize_strategy_display_name(
+            strategy_name_raw if strategy_name_raw else strategy_id
+        ) if strategy_id or strategy_name_raw else ""
         direction = str(data.get("direction", "") or "").upper()
         direction_label, direction_color = dir_color_map.get(direction, ("", "grey"))
+        qty_val = self._to_float(data.get("qty", None))
+        hands_val = None if qty_val is None else (qty_val / 100.0)
+        price_val = self._to_float(data.get("price", None))
+        amount_val = self._to_float(data.get("amount", None))
+        if amount_val is None and (price_val is not None) and (qty_val is not None):
+            amount_val = float(price_val) * float(qty_val)
+        fee_est = self._estimate_fee(direction, amount_val)
         level = str(data.get("level", "") or "").lower()
         level_label, level_color = level_label_map.get(level, ("", "grey"))
         metric = str(data.get("metric", "") or "")
@@ -391,13 +456,6 @@ class WebhookNotifier:
                         {"tag": "lark_md", "content": f"**说明**：{self._safe_text(msg)}"}
                     ]
                 })
-            elements.append({
-                "tag": "action",
-                "actions": [
-                    {"tag": "button", "text": {"tag": "plain_text", "content": "查看控制台"}, "type": "default", "value": {"event_type": event_type, "stock_code": stock_code}},
-                    {"tag": "button", "text": {"tag": "plain_text", "content": "标记已读"}, "type": "primary", "value": {"ack": True, "event_type": event_type}}
-                ]
-            })
             return {
                 "msg_type": "interactive",
                 "card": {
@@ -414,12 +472,21 @@ class WebhookNotifier:
             kv_lines.append(f"**信号时间**：{self._safe_text(event_time)}")
         if strategy_id:
             kv_lines.append(f"**策略ID**：`{self._safe_text(strategy_id)}`")
+        if strategy_name:
+            kv_lines.append(f"**策略名称**：{self._safe_text(strategy_name)}")
         if direction_label:
             kv_lines.append(f"**方向**：<font color='{direction_color}'>{self._safe_text(direction_label)}</font>")
         if data.get("price") is not None:
             kv_lines.append(f"**价格**：`{self._safe_text(data.get('price'))}`")
         if data.get("qty") is not None:
             kv_lines.append(f"**数量**：`{self._safe_text(data.get('qty'))}`")
+        if hands_val is not None:
+            kv_lines.append(f"**手数**：`{self._safe_text(f'{hands_val:.2f}手')}`")
+        if amount_val is not None:
+            amount_label = "买入金额" if direction == "BUY" else ("卖出金额" if direction == "SELL" else "成交金额")
+            kv_lines.append(f"**{amount_label}**：`{self._safe_text(self._fmt_amount(amount_val))}`")
+        if fee_est is not None:
+            kv_lines.append(f"**预估手续费**：`{self._safe_text(self._fmt_amount(fee_est.get('total')))}`")
         if metric_label:
             kv_lines.append(f"**监控指标**：{self._safe_text(metric_label)}")
         if level_label:
@@ -513,13 +580,6 @@ class WebhookNotifier:
                     {"tag": "lark_md", "content": f"**说明**：{self._safe_text(msg)}"}
                 ]
             })
-        elements.append({
-            "tag": "action",
-            "actions": [
-                {"tag": "button", "text": {"tag": "plain_text", "content": "查看控制台"}, "type": "default", "value": {"event_type": event_type, "stock_code": stock_code}},
-                {"tag": "button", "text": {"tag": "plain_text", "content": "标记已读"}, "type": "primary", "value": {"ack": True, "event_type": event_type}}
-            ]
-        })
         return {
             "msg_type": "interactive",
             "card": {
@@ -677,6 +737,8 @@ class WebhookNotifier:
     async def _send_job(self, channel_type, url, event_type, data, stock_code, timeout_sec, feishu_secret):
         text = self._build_text(event_type, stock_code, data)
         if channel_type == "feishu":
+            if not self._allow_feishu_event(event_type, data):
+                return
             payload = self._build_feishu_payload(event_type, stock_code, data)
             if feishu_secret:
                 ts, sign = self._feishu_sign(feishu_secret)
@@ -764,7 +826,7 @@ class WebhookNotifier:
         jobs = []
         for url in generic_urls:
             jobs.append(("generic", url))
-        if feishu_url:
+        if feishu_url and self._allow_feishu_event(event_type, data):
             jobs.append(("feishu", feishu_url))
         if not jobs:
             return

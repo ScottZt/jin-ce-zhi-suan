@@ -1,7 +1,7 @@
 {
   "system": {
-    "mode": "backtest",
-    "enable_live": false,
+    "mode": "live",
+    "enable_live": true,
     "initial_capital": 1000000,
     "log_level": "INFO",
     "server_host": "0.0.0.0",
@@ -22,7 +22,7 @@
     ]
   },
   "data_provider": {
-    "source": "default",
+    "source": "tushare",
     "enable_fallback": false,
     "tushare_token": "",
     "default_api_key": "",
@@ -30,7 +30,7 @@
     "mysql_host": "127.0.0.1",
     "mysql_port": 3306,
     "mysql_user": "root",
-    "mysql_password": "",
+    "mysql_password": "123456",
     "mysql_database": "quantifydata",
     "mysql_charset": "utf8mb4",
     "mysql_pool_size": 6,
@@ -96,8 +96,11 @@
     "direct_db_source": "mysql"
   },
   "targets": [
-    "301227.SZ",
-    "603083.SH"
+    "300308.SZ",
+    "300274.SZ",
+    "600406.SH",
+    "688331.SH",
+    "002432.SZ"
   ],
   "strategies": {
     "active_ids": [
@@ -111,6 +114,8 @@
       "18",
       "19",
       "20",
+      "26",
+      "28",
       "34R1",
       "34R1U",
       "34R1U500",
