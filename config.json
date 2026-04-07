@@ -22,7 +22,7 @@
     ]
   },
   "data_provider": {
-    "source": "akshare",
+    "source": "default",
     "enable_fallback": false,
     "tushare_token": "",
     "default_api_key": "",

@@ -367,7 +367,6 @@ python server.py
 - 说明：商业授权范围、费用与支持条款以双方签署协议为准。
 
 
-
 **项目答疑咨询** 
 - 星球内容
 金策智算安装、部署、配置一站式教程
@@ -385,8 +384,6 @@ Web 面板、飞书消息推送、告警配置
   <img src="static/星球优惠券.png" width="45%" />
   <img src="static/星球二维码.png" width="45%" />
 </p>
-
-<img width="508" height="813" alt="d02b159dbb826cdf9875c01aa06d9b63" src="static/硅基流码.png" />
 
 
 **免责声明**

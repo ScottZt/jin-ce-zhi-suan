@@ -1618,6 +1618,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         let currentBacktestReportId = '';
         let backtestStartInFlight = false;
         let disclaimerAccepted = false;
+        const DISCLAIMER_SKIP_ONCE_KEY = 'jince-disclaimer-skip-once-v1';
         const STRATEGY_GUIDE = {
             all: {
                 name: '全部策略总览',
@@ -7282,11 +7283,26 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (!overlay || !disclaimerAccepted) return;
             overlay.classList.remove('active');
         }
+
+        function applyInitialDisclaimerState() {
+            const checkbox = document.getElementById('disclaimer-agree-checkbox');
+            let skipOnce = false;
+            try {
+                skipOnce = sessionStorage.getItem(DISCLAIMER_SKIP_ONCE_KEY) === '1';
+                if (skipOnce) sessionStorage.removeItem(DISCLAIMER_SKIP_ONCE_KEY);
+            } catch (_) {}
+            if (skipOnce) {
+                disclaimerAccepted = true;
+                if (checkbox) checkbox.checked = true;
+            }
+            updateDisclaimerAccess();
+            if (skipOnce) enterSystemByDisclaimer();
+        }
         
         // Initial Log
         logMessage('SYSTEM', '控制台就绪，等待连接...', 'info');
         restoreConsoleState();
-        updateDisclaimerAccess();
+        applyInitialDisclaimerState();
         document.getElementById('disclaimer-agree-checkbox')?.addEventListener('change', updateDisclaimerAccess);
         document.getElementById('disclaimer-enter-btn')?.addEventListener('click', enterSystemByDisclaimer);
         document.getElementById('kline-modal')?.addEventListener('click', (e) => {

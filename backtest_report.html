@@ -24,7 +24,7 @@
             <h1 class="text-2xl font-bold"><i class="fa-solid fa-chart-line text-blue-400 mr-2"></i>回测报告中心</h1>
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <button id="refresh-btn" class="text-sm bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded border border-blue-600 w-1/2 sm:w-auto whitespace-nowrap transition-all duration-200 hover:-translate-y-0.5 active:scale-95">刷新报告</button>
-                <a href="/" class="text-sm bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded border border-slate-700 text-center w-1/2 sm:w-auto whitespace-nowrap transition-all duration-200 hover:-translate-y-0.5 active:scale-95">返回控制台</a>
+                <a id="return-console-btn" href="/" class="text-sm bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded border border-slate-700 text-center w-1/2 sm:w-auto whitespace-nowrap transition-all duration-200 hover:-translate-y-0.5 active:scale-95">返回控制台</a>
             </div>
         </div>
 
@@ -701,6 +701,11 @@
         }
 
         document.getElementById('refresh-btn').addEventListener('click', refreshAll);
+        document.getElementById('return-console-btn')?.addEventListener('click', () => {
+            try {
+                sessionStorage.setItem('jince-disclaimer-skip-once-v1', '1');
+            } catch (_) {}
+        });
         document.getElementById('history-list').addEventListener('click', async (e) => {
             const target = e.target.closest('button[data-rid]');
             if (!target) return;
