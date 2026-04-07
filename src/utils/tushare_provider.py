@@ -27,6 +27,12 @@ class TushareProvider:
         self._replay_speed = float(os.getenv("OPENCLAW_TUSHARE_REPLAY_SPEED", "0") or 0.0)
         self._replay_enabled = bool(self._replay_day and self._replay_speed > 0)
         self._replay_state = {}
+        self._rt_min_cache_ttl_sec = max(1.0, float(cfg.get("data_provider.tushare_rt_min_cache_ttl_sec", 8) or 8))
+        self._rt_min_max_calls_per_min = max(1, int(cfg.get("data_provider.tushare_rt_min_max_calls_per_min", 50) or 50))
+        self._rt_min_backoff_sec = max(5.0, float(cfg.get("data_provider.tushare_rt_min_backoff_sec", 25) or 25))
+        self._rt_min_recent_calls = []
+        self._rt_min_block_until = 0.0
+        self._rt_min_cache = {}
         self.last_error = ""
         import tushare.pro.client as client
         client.DataApi._DataApi__http_url = "http://tushare.xyz"
@@ -100,6 +106,51 @@ class TushareProvider:
             result_text = str(result or "")
         status = "ok" if not err else f"fail err={err}"
         print(f"📡 Tushare拉取 interface={interface} code={code}{range_text} status={status} result={result_text}")
+
+    def _is_rt_min_rate_limit_error(self, err):
+        text = str(err or "").lower()
+        if not text:
+            return False
+        return ("每分钟最多访问" in text) or ("rate limit" in text) or ("too many requests" in text) or ("频率" in text and "限制" in text)
+
+    def _cleanup_rt_min_recent_calls(self, now_mono=None):
+        now_v = float(now_mono if now_mono is not None else time.monotonic())
+        self._rt_min_recent_calls = [x for x in self._rt_min_recent_calls if (now_v - float(x)) < 60.0]
+
+    def _consume_rt_min_quota(self):
+        now_mono = time.monotonic()
+        self._cleanup_rt_min_recent_calls(now_mono=now_mono)
+        if now_mono < float(self._rt_min_block_until or 0.0):
+            wait_sec = max(0.0, float(self._rt_min_block_until) - now_mono)
+            return False, f"rt_min_backoff_active remain={wait_sec:.1f}s"
+        if len(self._rt_min_recent_calls) >= int(self._rt_min_max_calls_per_min):
+            return False, f"rt_min_rate_guard active calls={len(self._rt_min_recent_calls)}/{int(self._rt_min_max_calls_per_min)}"
+        self._rt_min_recent_calls.append(now_mono)
+        return True, ""
+
+    def _get_rt_min_cached_df(self, code, max_age_sec=None):
+        code_u = str(code).upper()
+        state = self._rt_min_cache.get(code_u)
+        if not isinstance(state, dict):
+            return pd.DataFrame()
+        ts_mono = float(state.get("ts", 0.0) or 0.0)
+        df = state.get("df")
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            return pd.DataFrame()
+        ttl = float(max_age_sec if max_age_sec is not None else self._rt_min_cache_ttl_sec)
+        if (time.monotonic() - ts_mono) > max(0.1, ttl):
+            return pd.DataFrame()
+        return df.copy()
+
+    def _set_rt_min_cached_df(self, code, df):
+        code_u = str(code).upper()
+        norm = self._normalize_minutes_df(df)
+        if norm.empty:
+            return
+        self._rt_min_cache[code_u] = {
+            "ts": time.monotonic(),
+            "df": norm.copy()
+        }
 
     def _cache_file_path(self, code, interval="1min"):
         safe_code = str(code).upper().replace(".", "_")
@@ -335,12 +386,31 @@ class TushareProvider:
     def _fetch_rt_min(self, code, start_time=None, end_time=None):
         if not self.pro:
             return pd.DataFrame()
+        cached = self._get_rt_min_cached_df(code)
+        allowed, quota_msg = self._consume_rt_min_quota()
+        if not allowed:
+            if not cached.empty:
+                self._trace_fetch("rt_min_cache", code, start_time=start_time, end_time=end_time, result=cached, err=quota_msg)
+                return cached
+            self.last_error = quota_msg
+            self._trace_fetch("rt_min", code, start_time=start_time, end_time=end_time, result=pd.DataFrame(), err=quota_msg)
+            return pd.DataFrame()
         try:
             df = self.pro.rt_min(ts_code=code)
         except Exception as e:
-            self._trace_fetch("rt_min", code, start_time=start_time, end_time=end_time, result=pd.DataFrame(), err=str(e))
+            err_text = str(e)
+            if self._is_rt_min_rate_limit_error(err_text):
+                self._rt_min_block_until = time.monotonic() + float(self._rt_min_backoff_sec)
+                if not cached.empty:
+                    self.last_error = f"rt_min_rate_limited use_cache_ttl={int(self._rt_min_cache_ttl_sec)}s"
+                    self._trace_fetch("rt_min_cache", code, start_time=start_time, end_time=end_time, result=cached, err=err_text)
+                    return cached
+            self._trace_fetch("rt_min", code, start_time=start_time, end_time=end_time, result=pd.DataFrame(), err=err_text)
             return pd.DataFrame()
         if df is None or df.empty:
+            if not cached.empty:
+                self._trace_fetch("rt_min_cache", code, start_time=start_time, end_time=end_time, result=cached, err="empty")
+                return cached
             self._trace_fetch("rt_min", code, start_time=start_time, end_time=end_time, result=pd.DataFrame(), err="empty")
             return pd.DataFrame()
         work = df.copy()
@@ -373,6 +443,7 @@ class TushareProvider:
         if et is not None and (not pd.isna(et)):
             work = work[work["dt"] <= et]
         out = work.reset_index(drop=True)
+        self._set_rt_min_cached_df(code, out)
         self._trace_fetch("rt_min", code, start_time=start_time, end_time=end_time, result=out)
         return out
 
@@ -395,33 +466,25 @@ class TushareProvider:
                 return replay_bar
         try:
             try:
-                df = self.pro.rt_min(ts_code=code)
+                df = self._fetch_rt_min(code)
                 if df is not None and not df.empty:
-                    row = df.iloc[0]
-                    time_val = str(row.get('time', '')).strip()
-                    if not time_val:
-                        raise ValueError("rt_min missing time")
-                    if ("-" in time_val) and (":" in time_val):
-                        dt = pd.to_datetime(time_val, errors='coerce')
-                    else:
-                        today = datetime.now().strftime("%Y-%m-%d")
-                        dt = pd.to_datetime(f"{today} {time_val}", errors='coerce')
+                    row = df.sort_values("dt").iloc[-1]
+                    dt = pd.to_datetime(row.get('dt'), errors='coerce')
                     if pd.isna(dt):
-                        raise ValueError(f"rt_min invalid time: {time_val}")
+                        raise ValueError("rt_min invalid dt")
 
                     payload = {
-                        'code': str(row.get('ts_code', code)),
+                        'code': str(row.get('code', code)),
                         'dt': dt,
-                        'open': float(row['open']),
-                        'high': float(row['high']),
-                        'low': float(row['low']),
-                        'close': float(row['close']),
-                        'vol': float(row['vol']),
-                        'amount': float(row['amount'])
+                        'open': float(row.get('open', 0.0) or 0.0),
+                        'high': float(row.get('high', 0.0) or 0.0),
+                        'low': float(row.get('low', 0.0) or 0.0),
+                        'close': float(row.get('close', 0.0) or 0.0),
+                        'vol': float(row.get('vol', 0.0) or 0.0),
+                        'amount': float(row.get('amount', 0.0) or 0.0)
                     }
                     self._append_rt_today_bar(code, payload)
                     self.last_error = ""
-                    self._trace_fetch("rt_min", code, result=payload)
                     return payload
             except Exception as e_rt:
                 self.last_error = f"rt_min_failed code={code} err={e_rt}"

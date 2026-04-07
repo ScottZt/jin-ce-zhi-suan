@@ -12,6 +12,7 @@ import re
 import urllib.request
 import urllib.error
 import io
+import subprocess
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -22,6 +23,8 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, List, Any
 from src.core.live_cabinet import LiveCabinet
@@ -77,6 +80,7 @@ logging.basicConfig(
 logger = logging.getLogger("CabinetServer")
 _QUIET_HTTP_PATHS = {
     "/api/status",
+    "/api/status/light",
     "/api/history_sync/status",
     "/api/config",
     "/api/config/save",
@@ -91,7 +95,24 @@ class _UvicornAccessPathFilter(logging.Filter):
                 return False
         return True
 
+class CachedStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        try:
+            resp = await super().get_response(path, scope)
+            return resp
+        except StarletteHTTPException as e:
+            if int(getattr(e, "status_code", 500)) != 404:
+                raise
+            rel_path = str(path or "").replace("\\", "/").lstrip("/")
+            ok = await asyncio.to_thread(_cache_known_static_asset_if_missing, rel_path)
+            if not ok:
+                raise
+            return await super().get_response(path, scope)
+
 app = FastAPI(title="三省六部 AI 交易决策控制台")
+STATIC_DIR = os.path.abspath("static")
+os.makedirs(STATIC_DIR, exist_ok=True)
+app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
 
 @app.middleware("http")
 async def log_requests(request, call_next):
@@ -1326,6 +1347,10 @@ class HistorySyncScheduleRequest(BaseModel):
     write_mode: Optional[str] = None
     direct_db_source: Optional[str] = None
 
+class FrontendAssetCacheRequest(BaseModel):
+    relative_path: str
+    remote_url: str
+
 
 def _extract_code_block(text):
     m = re.search(r"```python\s*([\s\S]*?)```", str(text or ""), re.IGNORECASE)
@@ -1582,6 +1607,159 @@ async def get_logo():
         media_type="image/png",
         headers={"Cache-Control": "public, max-age=31536000, immutable"}
     )
+
+def _cache_frontend_asset_file(remote_url: str, target_path: str):
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    tmp_path = f"{target_path}.tmp"
+    try:
+        with urllib.request.urlopen(remote_url, timeout=20) as resp:
+            body = resp.read()
+        if not body:
+            raise RuntimeError("downloaded file is empty")
+        with open(tmp_path, "wb") as f:
+            f.write(body)
+        os.replace(tmp_path, target_path)
+        return
+    except Exception as e:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+        ps_url = remote_url.replace("'", "''")
+        ps_out = tmp_path.replace("'", "''")
+        ps_cmd = f"Invoke-WebRequest -Uri '{ps_url}' -OutFile '{ps_out}' -UseBasicParsing"
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_cmd],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        if result.returncode != 0:
+            stderr = (result.stderr or result.stdout or "").strip()
+            if stderr:
+                raise RuntimeError(f"{str(e)} | powershell: {stderr[:300]}")
+            raise
+        if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) <= 0:
+            raise RuntimeError("powershell downloaded file is empty")
+        os.replace(tmp_path, target_path)
+
+def _cache_fontawesome_webfonts_if_needed(rel_path: str, remote_url: str, target_path: str):
+    normalized = rel_path.replace("\\", "/").lower()
+    if "font-awesome" not in normalized or not normalized.endswith("/css/all.min.css"):
+        return
+    base_remote = remote_url.rsplit("/css/all.min.css", 1)[0]
+    if not base_remote:
+        return
+    css_dir = os.path.dirname(target_path)
+    fa_root = os.path.dirname(css_dir)
+    webfont_dir = os.path.join(fa_root, "webfonts")
+    names = [
+        "fa-solid-900.woff2",
+        "fa-regular-400.woff2",
+        "fa-brands-400.woff2",
+        "fa-solid-900.ttf",
+        "fa-regular-400.ttf",
+        "fa-brands-400.ttf"
+    ]
+    for name in names:
+        fp = os.path.join(webfont_dir, name)
+        if os.path.exists(fp) and os.path.getsize(fp) > 0:
+            continue
+        url = f"{base_remote}/webfonts/{name}"
+        try:
+            _cache_frontend_asset_file(url, fp)
+        except Exception as e:
+            logger.warning("font-awesome webfont cache failed: %s %s", name, str(e))
+
+def _frontend_asset_candidate_urls(rel_path: str, remote_url: str):
+    out = []
+    seen = set()
+    def add(u):
+        uu = str(u or "").strip()
+        if not uu or uu in seen:
+            return
+        seen.add(uu)
+        out.append(uu)
+    normalized = str(rel_path or "").replace("\\", "/").lower()
+    add(remote_url)
+    if normalized.endswith("vendor/font-awesome/6.4.0/css/all.min.css"):
+        add("https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css")
+        add("https://fastly.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css")
+    if normalized.startswith("vendor/font-awesome/6.4.0/webfonts/"):
+        fname = normalized.split("/")[-1]
+        add(f"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/{fname}")
+        add(f"https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/webfonts/{fname}")
+        add(f"https://fastly.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/webfonts/{fname}")
+    if normalized.endswith("vendor/lightweight-charts/lightweight-charts.standalone.production.js"):
+        add("https://cdn.jsdelivr.net/npm/lightweight-charts/dist/lightweight-charts.standalone.production.js")
+        add("https://fastly.jsdelivr.net/npm/lightweight-charts/dist/lightweight-charts.standalone.production.js")
+    return out
+
+def _cache_known_static_asset_if_missing(rel_path: str):
+    rel = str(rel_path or "").strip().replace("\\", "/")
+    if not rel or rel.startswith("/") or rel.startswith(".") or ".." in rel.split("/"):
+        return False
+    target_path = os.path.abspath(os.path.join(STATIC_DIR, rel))
+    try:
+        if os.path.commonpath([STATIC_DIR, target_path]) != STATIC_DIR:
+            return False
+    except Exception:
+        return False
+    if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
+        return True
+    lowered = rel.lower()
+    primary = ""
+    if lowered == "vendor/font-awesome/6.4.0/css/all.min.css":
+        primary = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    elif lowered.startswith("vendor/font-awesome/6.4.0/webfonts/"):
+        fname = lowered.split("/")[-1]
+        primary = f"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/{fname}"
+    elif lowered == "vendor/lightweight-charts/lightweight-charts.standalone.production.js":
+        primary = "https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"
+    else:
+        return False
+    errs = []
+    for u in _frontend_asset_candidate_urls(rel, primary):
+        try:
+            _cache_frontend_asset_file(u, target_path)
+            _cache_fontawesome_webfonts_if_needed(rel, u, target_path)
+            return True
+        except Exception as e:
+            errs.append(str(e))
+    if errs:
+        logger.warning("static fallback cache failed: %s => %s", rel, errs[-1])
+    return False
+
+@app.post("/api/frontend/cache_asset")
+async def cache_frontend_asset(req: FrontendAssetCacheRequest):
+    rel_path = str(req.relative_path or "").strip().replace("\\", "/")
+    remote_url = str(req.remote_url or "").strip()
+    if not rel_path:
+        return {"status": "error", "msg": "relative_path is required"}
+    if rel_path.startswith("/") or rel_path.startswith(".") or ".." in rel_path.split("/"):
+        return {"status": "error", "msg": "invalid relative_path"}
+    if not remote_url.startswith("https://"):
+        return {"status": "error", "msg": "remote_url must be https"}
+    target_path = os.path.abspath(os.path.join(STATIC_DIR, rel_path))
+    try:
+        if os.path.commonpath([STATIC_DIR, target_path]) != STATIC_DIR:
+            return {"status": "error", "msg": "invalid target path"}
+    except Exception:
+        return {"status": "error", "msg": "invalid target path"}
+    local_url = f"/static/{rel_path}"
+    if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
+        return {"status": "success", "cached": True, "local_url": local_url}
+    errs = []
+    for u in _frontend_asset_candidate_urls(rel_path, remote_url):
+        try:
+            _cache_frontend_asset_file(u, target_path)
+            _cache_fontawesome_webfonts_if_needed(rel_path, u, target_path)
+            return {"status": "success", "cached": True, "local_url": local_url}
+        except Exception as e:
+            errs.append(str(e))
+    msg = " | ".join(errs[-2:]) if errs else "unknown"
+    return {"status": "error", "msg": f"cache failed: {msg}", "local_url": local_url}
 
 @app.get("/api/search")
 async def search_stocks(q: str = ""):
@@ -2125,12 +2303,13 @@ def _build_ai_report_review(report_item):
             raw = resp.read().decode("utf-8")
         obj = json.loads(raw)
         return str(obj.get("choices", [{}])[0].get("message", {}).get("content", "")).strip()
-    except Exception:
+    except Exception as e:
+        logger.error(f"ai_review llm call failed url={url} model={model_name} err={e}", exc_info=True)
         return ""
 
 
 @app.post("/api/report/{report_id}/ai_review")
-async def api_report_ai_review(report_id: str):
+async def api_report_ai_review(report_id: str, force: bool = False):
     try:
         load_report_history()
         for idx, r in enumerate(report_history if isinstance(report_history, list) else []):
@@ -2139,19 +2318,28 @@ async def api_report_ai_review(report_id: str):
             if str(r.get("report_id")) != str(report_id):
                 continue
             rid = str(report_id)
-            cached = str(report_ai_review_cache.get(rid, "") or "").strip()
-            cached_ver = int(report_ai_review_cache.get(f"{rid}__v", 0) or 0)
-            if cached and cached_ver == AI_REVIEW_SCHEMA_VERSION:
-                return {"status": "success", "report_id": report_id, "analysis": cached, "cached": True}
-            cached = str(r.get("ai_review_text", "") or "").strip()
-            persisted_ver = int(r.get("ai_review_version", 0) or 0)
-            if cached and persisted_ver == AI_REVIEW_SCHEMA_VERSION:
-                report_ai_review_cache[rid] = cached
-                report_ai_review_cache[f"{rid}__v"] = AI_REVIEW_SCHEMA_VERSION
-                return {"status": "success", "report_id": report_id, "analysis": cached, "cached": True}
+            if not force:
+                cached = str(report_ai_review_cache.get(rid, "") or "").strip()
+                cached_ver = int(report_ai_review_cache.get(f"{rid}__v", 0) or 0)
+                if cached and cached_ver == AI_REVIEW_SCHEMA_VERSION:
+                    return {"status": "success", "report_id": report_id, "analysis": cached, "cached": True}
+                cached = str(r.get("ai_review_text", "") or "").strip()
+                persisted_ver = int(r.get("ai_review_version", 0) or 0)
+                if cached and persisted_ver == AI_REVIEW_SCHEMA_VERSION:
+                    report_ai_review_cache[rid] = cached
+                    report_ai_review_cache[f"{rid}__v"] = AI_REVIEW_SCHEMA_VERSION
+                    return {"status": "success", "report_id": report_id, "analysis": cached, "cached": True}
+            cfg = ConfigLoader.reload()
+            missing = []
+            if not str(cfg.get("data_provider.llm_api_url", "") or "").strip():
+                missing.append("llm_api_url")
+            if not str(cfg.get("data_provider.llm_api_key", "") or "").strip():
+                missing.append("llm_api_key")
+            if missing:
+                return {"status": "error", "msg": f"AI复盘未配置：请先在配置中填写 {', '.join(missing)}"}
             analysis = _build_ai_report_review(r)
             if not analysis:
-                return {"status": "error", "msg": "AI复盘生成失败，请检查模型配置"}
+                return {"status": "error", "msg": "AI复盘生成失败：模型调用超时、鉴权失败或返回空内容，请检查模型配置与服务日志"}
             report_history[idx]["ai_review_text"] = analysis
             report_history[idx]["ai_review_version"] = AI_REVIEW_SCHEMA_VERSION
             report_ai_review_cache[rid] = analysis
@@ -2861,15 +3049,13 @@ async def api_reload_strategies():
         logger.error(f"Failed to reload strategies: {str(e)}", exc_info=True)
         return {"status": "error", "msg": f"Failed to reload strategies: {str(e)}"}
 
-@app.get("/api/status")
-async def api_get_status():
-    """Get current system status"""
+def _build_status_payload(include_fund_pools: bool = True):
     backtest_running = cabinet_task is not None and not cabinet_task.done()
     running_codes = _live_running_codes()
     is_running = backtest_running or bool(running_codes)
     live_cap_map = _capital_snapshot(running_codes)
     live_cap_total = float(sum(float(v or 0.0) for v in live_cap_map.values()))
-    return {
+    payload = {
         "is_running": is_running,
         "backtest_running": backtest_running,
         "live_running": bool(running_codes),
@@ -2880,7 +3066,6 @@ async def api_get_status():
         "live_capital_total": live_cap_total,
         "live_allocation_mode": str(live_capital_plan_mode or "equal"),
         "live_allocation_weights": dict(live_capital_plan_weights or {}),
-        "live_fund_pools": _collect_live_fund_pools(),
         "active_cabinet_type": type(current_cabinet).__name__ if current_cabinet else None,
         "live_last_error": live_last_error,
         "provider_source": current_provider_source or config.get("data_provider.source", "default"),
@@ -2890,6 +3075,19 @@ async def api_get_status():
         "current_report_status": current_backtest_report.get("status") if current_backtest_report else None,
         "current_report_error": current_backtest_report.get("error_msg") if current_backtest_report else None
     }
+    if include_fund_pools:
+        payload["live_fund_pools"] = _collect_live_fund_pools()
+    return payload
+
+@app.get("/api/status")
+async def api_get_status():
+    """Get current system status"""
+    return _build_status_payload(include_fund_pools=True)
+
+@app.get("/api/status/light")
+async def api_get_status_light():
+    """Get lightweight system status for high-frequency polling"""
+    return _build_status_payload(include_fund_pools=False)
 
 @app.get("/api/live/fund_pool")
 async def api_get_live_fund_pool(stock_code: Optional[str] = None, include_transactions: bool = False, tx_limit: int = 200):
@@ -3489,6 +3687,20 @@ async def emit_event_to_ws(event_type, data, stock_code=None):
             flow_msg = str(emit_data.get("msg", "") or "").strip()
             if flow_msg:
                 logger.info("BacktestDataFetch flow=%s", flow_msg)
+    elif event_type == "live_auto_stop":
+        auto_msg = ""
+        if isinstance(emit_data, dict):
+            auto_msg = str(emit_data.get("msg", "") or "").strip()
+        if not auto_msg:
+            auto_msg = "已超过15:30，自动关闭实盘模式"
+        stopped_live = await _stop_live_tasks(clear_profile=True)
+        if isinstance(emit_data, dict):
+            emit_data = dict(emit_data)
+            emit_data["stopped_live_codes"] = stopped_live
+        await _broadcast_system_and_notify(
+            f"{auto_msg}（已停止: {','.join(stopped_live) if stopped_live else '无运行任务'}）",
+            stopped_live
+        )
     payload = {
         "type": event_type,
         "data": emit_data,

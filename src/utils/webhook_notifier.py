@@ -16,6 +16,7 @@ from src.utils.config_loader import ConfigLoader
 
 
 logger = logging.getLogger("WebhookNotifier")
+FEISHU_LIVE_DISCLAIMER = "本信号为算法计算，非投资建议，仅供研究，不构成买卖依据。"
 
 
 class WebhookNotifier:
@@ -211,7 +212,10 @@ class WebhookNotifier:
         return "\n".join(lines)
 
     def _allow_feishu_event(self, event_type, data):
-        if str(event_type or "") != "trade_exec":
+        et = str(event_type or "").strip()
+        if et == "daily_summary":
+            return True
+        if et != "trade_exec":
             return False
         if not isinstance(data, dict):
             return False
@@ -392,7 +396,8 @@ class WebhookNotifier:
                 f"**标的**：`{self._safe_text(stock_code)}`\n"
                 f"**时间**：{self._safe_text(now_text)}\n"
                 f"**事件**：{self._safe_text(title)}\n"
-                f"**内容**：{self._safe_text(data)}"
+                f"**内容**：{self._safe_text(data)}\n\n"
+                f"<font color='red'>**⚠️ 免责声明：{self._safe_text(FEISHU_LIVE_DISCLAIMER)}**</font>"
             )
             return {
                 "msg_type": "interactive",
@@ -479,6 +484,12 @@ class WebhookNotifier:
                         {"tag": "lark_md", "content": f"**说明**：{self._safe_text(msg)}"}
                     ]
                 })
+            elements.append({
+                "tag": "note",
+                "elements": [
+                    {"tag": "lark_md", "content": f"<font color='red'>**⚠️ 免责声明：{self._safe_text(FEISHU_LIVE_DISCLAIMER)}**</font>"}
+                ]
+            })
             return {
                 "msg_type": "interactive",
                 "card": {
@@ -534,35 +545,18 @@ class WebhookNotifier:
             win_rate_text = "--" if win_rate is None else f"{win_rate:.2f}%"
             max_dd_text = "--" if max_dd is None else f"{max_dd:.2f}%"
             net_pnl_text = "--" if net_pnl is None else f"{net_pnl:.2f}"
-            win_color = "grey" if win_rate is None else ("green" if win_rate >= 55 else ("orange" if win_rate >= 40 else "red"))
+            win_color = "grey" if win_rate is None else ("red" if win_rate >= 55 else ("orange" if win_rate >= 40 else "green"))
             dd_color = "grey" if max_dd is None else ("green" if max_dd < 3 else ("orange" if max_dd < 6 else "red"))
-            pnl_color = "grey" if net_pnl is None else ("green" if net_pnl >= 0 else "red")
-            top3 = data.get("top3_signals", [])
-            top_rows = []
-            if isinstance(top3, list):
-                for i, item in enumerate(top3[:3], start=1):
-                    if not isinstance(item, dict):
-                        continue
-                    name = self._normalize_strategy_display_name(item.get("name", "--"), rank_idx=i)
-                    cnt = int(item.get("count", 0) or 0)
-                    top_rows.append(f"{i}. `{self._safe_text(name)}` · {cnt}次")
-            top_text = "\n".join(top_rows) if top_rows else "暂无信号统计"
+            pnl_color = "grey" if net_pnl is None else ("red" if net_pnl >= 0 else "green")
             elements = [
                 {"tag": "div", "text": {"tag": "lark_md", "content": (
-                    f"**标的**：`{self._safe_text(stock_code)}`\n"
-                    f"**汇总日期**：{self._safe_text(str(data.get('date', now_text[:10])))}\n"
-                    f"**推送时间**：{self._safe_text(now_text)}"
-                )}},
-                {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": (
                     "**📊 日终汇总看板**\n"
+                    f"**汇总日期**：{self._safe_text(str(data.get('date', now_text[:10])))}\n"
+                    f"**推送时间**：{self._safe_text(now_text)}\n"
                     f"**总交易数**：`{total_trades}`\n"
                     f"**胜率**：<font color='{win_color}'>{self._safe_text(win_rate_text)}</font>\n"
                     f"**当日净盈亏**：<font color='{pnl_color}'>{self._safe_text(net_pnl_text)}</font>\n"
                     f"**最大回撤**：<font color='{dd_color}'>{self._safe_text(max_dd_text)}</font>"
-                )}},
-                {"tag": "div", "text": {"tag": "lark_md", "content": (
-                    f"**🏆 Top3 信号策略**\n{top_text}"
                 )}}
             ]
         if msg:
@@ -572,6 +566,12 @@ class WebhookNotifier:
                     {"tag": "lark_md", "content": f"**说明**：{self._safe_text(msg)}"}
                 ]
             })
+        elements.append({
+            "tag": "note",
+            "elements": [
+                {"tag": "lark_md", "content": f"<font color='red'>**⚠️ 免责声明：{self._safe_text(FEISHU_LIVE_DISCLAIMER)}**</font>"}
+            ]
+        })
         return {
             "msg_type": "interactive",
             "card": {
@@ -737,10 +737,19 @@ class WebhookNotifier:
                 payload["timestamp"] = ts
                 payload["sign"] = sign
         else:
+            generic_data = data
+            if isinstance(data, dict):
+                generic_data = dict(data)
+                generic_data["disclaimer"] = FEISHU_LIVE_DISCLAIMER
+            else:
+                generic_data = {
+                    "content": data,
+                    "disclaimer": FEISHU_LIVE_DISCLAIMER
+                }
             payload = {
                 "event_type": event_type,
                 "stock_code": stock_code,
-                "data": data,
+                "data": generic_data,
                 "timestamp": datetime.now().isoformat(timespec="seconds")
             }
         await asyncio.to_thread(self._post_json, url, payload, timeout_sec)
@@ -806,7 +815,7 @@ class WebhookNotifier:
         if not bool(cfg.get("enabled", False)):
             return
         await self._maybe_retry_failed(cfg)
-        event_types = cfg.get("event_types", ["trade_exec", "live_alert", "zhongshu", "menxia", "system"])
+        event_types = cfg.get("event_types", ["trade_exec", "live_alert", "zhongshu", "menxia", "daily_summary", "system"])
         event_types = event_types if isinstance(event_types, list) else []
         if event_types and (event_type not in event_types):
             return

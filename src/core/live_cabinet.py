@@ -50,6 +50,19 @@ class LiveCabinet:
                 self._tushare_fallback_provider = TushareProvider(token=self.tushare_token, event_callback=self._emit_event)
             except Exception:
                 self._tushare_fallback_provider = None
+        sync_enabled = bool(self.config.get("live_monitoring.realtime_sync_to_default.enabled", True))
+        sync_sources = self.config.get("live_monitoring.realtime_sync_to_default.sources", ["tushare", "akshare", "mysql", "postgresql"])
+        sync_on_duplicate = str(self.config.get("live_monitoring.realtime_sync_to_default.on_duplicate", "update") or "update").strip().lower()
+        if sync_on_duplicate not in {"ignore", "update", "replace"}:
+            sync_on_duplicate = "update"
+        if not isinstance(sync_sources, list):
+            sync_sources = ["tushare", "akshare", "mysql", "postgresql"]
+        source_allow = {str(x or "").strip().lower() for x in sync_sources if str(x or "").strip()}
+        self._rt_sync_to_default_enabled = bool(sync_enabled and (self.provider_type in source_allow))
+        self._rt_sync_to_default_on_duplicate = sync_on_duplicate
+        self._rt_sync_to_default_provider = DataProvider() if self._rt_sync_to_default_enabled else None
+        self._rt_synced_bar_keys = set()
+        self._rt_sync_last_error = ""
         
         # Initialize Ministries
         self.personnel = LiBuPersonnel()
@@ -108,6 +121,7 @@ class LiveCabinet:
         self._intraday_signal_counter = {}
         self._daily_summary_sent_day = ""
         self._last_summary_tick_dt = None
+        self._daily_auto_stop_day = ""
         self._fund_pool_state_file = os.path.join("data", "live_fund_pool", f"{str(self.stock_code or '').upper()}.json")
         self._restore_virtual_fund_pool()
 
@@ -842,6 +856,33 @@ class LiveCabinet:
         cfg = ConfigLoader.reload()
         return cfg.get(path, default)
 
+    def _sync_realtime_bar_to_default(self, bar):
+        if not self._rt_sync_to_default_enabled:
+            return
+        if not isinstance(bar, dict):
+            return
+        provider = self._rt_sync_to_default_provider
+        if provider is None:
+            return
+        dt_val = pd.to_datetime(bar.get("dt"), errors="coerce")
+        if pd.isna(dt_val):
+            return
+        code = str(bar.get("code", self.stock_code) or self.stock_code).upper()
+        bar_key = f"{code}|{dt_val.strftime('%Y-%m-%d %H:%M:%S')}"
+        if bar_key in self._rt_synced_bar_keys:
+            return
+        rowcount = int(provider.upsert_realtime_minute_bar(bar, on_duplicate=self._rt_sync_to_default_on_duplicate) or 0)
+        if rowcount > 0:
+            self._rt_synced_bar_keys.add(bar_key)
+            if len(self._rt_synced_bar_keys) > 20000:
+                self._rt_synced_bar_keys = set(list(self._rt_synced_bar_keys)[-5000:])
+            self._rt_sync_last_error = ""
+            return
+        err = str(getattr(provider, "last_error", "") or "default datasource write failed")
+        if err != self._rt_sync_last_error:
+            print(f"⚠️ 实时增量回写 default 失败: {err}")
+            self._rt_sync_last_error = err
+
     def _level_of(self, value, warn, critical):
         v = float(value or 0.0)
         w = float(warn or 0.0)
@@ -1076,7 +1117,7 @@ class LiveCabinet:
         await self._emit_event('fund_pool', self.get_fund_pool_snapshot(include_transactions=False))
         
         # Try warm up, if it fails report reason and stop live loop
-        warmup_success = self.warm_up()
+        warmup_success = await asyncio.to_thread(self.warm_up)
         if self.startup_kline_freshness:
             await self._emit_event("live_kline_freshness", self.startup_kline_freshness)
         
@@ -1116,11 +1157,12 @@ class LiveCabinet:
         # Initial Event
         await self._emit_event('system', {'msg': '内阁实时监控已启动', 'stock': self.stock_code})
         
-        import asyncio
         try:
             while True:
                 try:
-                    await self._tick()
+                    should_stop = await self._tick()
+                    if should_stop:
+                        break
                 except Exception as e:
                     print(f"❌ 实盘tick异常: {e}")
                     await self._emit_event('system', {'msg': f'实盘tick异常: {e}', 'stock': self.stock_code})
@@ -1220,17 +1262,21 @@ class LiveCabinet:
         current_dt = None
         bar = None
         api_latency_ms = 0
+        now_wall = datetime.now()
+        should_stop = await self._check_market_close(now_wall)
+        if should_stop:
+            return True
 
         self._announce_kline_fetching(timeframe="1min")
         t0 = time.perf_counter()
-        bar = self.provider.get_latest_bar(self.stock_code)
+        bar = await asyncio.to_thread(self.provider.get_latest_bar, self.stock_code)
         api_latency_ms = int((time.perf_counter() - t0) * 1000)
         if (not bar) and self._tushare_fallback_provider is not None:
             t0 = time.perf_counter()
-            bar = self._tushare_fallback_provider.get_latest_bar(self.stock_code)
+            bar = await asyncio.to_thread(self._tushare_fallback_provider.get_latest_bar, self.stock_code)
             api_latency_ms = int((time.perf_counter() - t0) * 1000)
         if not bar:
-            repaired = self._pull_latest_minute_bar()
+            repaired = await asyncio.to_thread(self._pull_latest_minute_bar)
             if repaired is not None:
                 bar = repaired
             else:
@@ -1249,7 +1295,7 @@ class LiveCabinet:
         current_dt = self._to_naive_ts(bar.get('dt'))
         self.last_dt = self._to_naive_ts(self.last_dt)
         if self.last_dt is not None and (not pd.isna(self.last_dt)) and current_dt <= self.last_dt:
-            repaired = self._pull_latest_minute_bar()
+            repaired = await asyncio.to_thread(self._pull_latest_minute_bar)
             if repaired is not None:
                 repaired_dt = self._to_naive_ts(repaired.get('dt'))
                 if repaired_dt > self.last_dt:
@@ -1259,14 +1305,14 @@ class LiveCabinet:
                 if (datetime.now() - current_dt) > timedelta(days=1):
                     print(f"⚠️ 最新K线时间疑似过旧: {current_dt}")
                 print(f"⏳ 等待K线更新... (当前: {current_dt})", end='\r')
-            return
+            return False
         self.last_dt = current_dt
         now_wall = datetime.now()
         if current_dt is not None and current_dt > (now_wall + timedelta(minutes=1)):
             current_dt = now_wall.replace(second=0, microsecond=0)
             bar['dt'] = current_dt
         if not self._is_market_session_time(current_dt):
-            return
+            return False
         if "volume" not in bar and "vol" in bar:
             bar["volume"] = bar["vol"]
         if "vol" not in bar and "volume" in bar:
@@ -1275,6 +1321,7 @@ class LiveCabinet:
             bar["turnover"] = bar["amount"]
         if "amount" not in bar and "turnover" in bar:
             bar["amount"] = bar["turnover"]
+        await asyncio.to_thread(self._sync_realtime_bar_to_default, bar)
 
         self.daily_data_buffer.append(bar)
         hist_df = pd.DataFrame(self.daily_data_buffer)
@@ -1304,8 +1351,6 @@ class LiveCabinet:
 
         print(f"\n🆕 新K线生成: {current_dt} | Close: {bar['close']:.2f}")
         
-        # Check Archive
-        await self._check_market_close(current_dt)
         runnable_strategy_ids = self._get_runnable_strategy_ids(current_dt)
         tf_text, name_text = self._format_tick_trigger_log(runnable_strategy_ids)
         print(f"   ⏱ 本tick触发周期与策略: {tf_text if tf_text else '无'}")
@@ -1479,25 +1524,51 @@ class LiveCabinet:
             await self._emit_event('fund_pool', self.get_fund_pool_snapshot(include_transactions=False))
             await self._emit_account_snapshot()
         await self._emit_event('live_position_lots', self._live_lot_snapshot(current_dt))
+        return False
 
     async def _check_market_close(self, current_dt):
         dt_obj = pd.to_datetime(current_dt, errors="coerce")
         if pd.isna(dt_obj):
-            return
+            return False
+        day_text = dt_obj.strftime("%Y-%m-%d")
         last_dt = pd.to_datetime(self._last_summary_tick_dt, errors="coerce") if self._last_summary_tick_dt is not None else pd.NaT
         self._last_summary_tick_dt = dt_obj
-        cutoff = dt_obj.replace(hour=15, minute=30, second=0, microsecond=0)
-        crossed_cutoff = (not pd.isna(last_dt)) and (last_dt < cutoff <= dt_obj)
-        should_archive = self._is_trading_day(dt_obj) and crossed_cutoff and (not self.today_archived)
-        if should_archive:
+
+        summary_cutoff = dt_obj.replace(hour=15, minute=5, second=0, microsecond=0)
+        stop_cutoff = dt_obj.replace(hour=15, minute=30, second=0, microsecond=0)
+        reached_summary_cutoff = dt_obj >= summary_cutoff and (pd.isna(last_dt) or last_dt < summary_cutoff)
+        reached_stop_cutoff = dt_obj >= stop_cutoff and (pd.isna(last_dt) or last_dt < stop_cutoff)
+
+        should_summary = self._is_trading_day(dt_obj) and reached_summary_cutoff and (self._daily_summary_sent_day != day_text)
+        if should_summary:
             print(f"🌆 日终汇总时间到 ({dt_obj})，正在归档今日数据...")
             await self._emit_daily_summary_if_needed(dt_obj)
             self._archive_data()
             self.today_archived = True
-            
-        # Reset archived flag next day (simplified check)
+
+        should_auto_stop = self._is_trading_day(dt_obj) and reached_stop_cutoff and (self._daily_auto_stop_day != day_text)
+        if should_auto_stop:
+            self._daily_auto_stop_day = day_text
+            stop_msg = f"已超过15:30，自动关闭实盘模式：{day_text}"
+            print(f"🛑 {stop_msg}")
+            await self._emit_event("system", {
+                "msg": stop_msg,
+                "stock": self.stock_code,
+                "reason": "after_1530"
+            })
+            await self._emit_event("live_auto_stop", {
+                "msg": stop_msg,
+                "reason": "after_1530",
+                "date": day_text,
+                "time": dt_obj.strftime("%H:%M:%S")
+            })
+            return True
+
         if dt_obj.hour < 9:
             self.today_archived = False
+            if self._daily_auto_stop_day != day_text:
+                self._daily_auto_stop_day = ""
+        return False
 
     def _archive_data(self):
         if not self.daily_data_buffer:

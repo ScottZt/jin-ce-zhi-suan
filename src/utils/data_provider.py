@@ -51,6 +51,24 @@ class DataProvider:
         self.last_error = last_msg
         return None
 
+    def _request_post(self, path, payload, timeout=20):
+        last_msg = ""
+        for h in self._header_candidates():
+            headers = dict(h or {})
+            headers["Content-Type"] = "application/json"
+            try:
+                response = requests.post(f"{self.base_url}{path}", headers=headers, json=payload, timeout=timeout)
+                if response.status_code == 200:
+                    return response
+                detail = response.text[:240]
+                if not last_msg:
+                    last_msg = f"{path} {response.status_code} headers={list(headers.keys())} detail={detail}"
+            except Exception as e:
+                if not last_msg:
+                    last_msg = f"{path} request error err={e}"
+        self.last_error = last_msg
+        return None
+
     def _extract_rows(self, payload):
         if isinstance(payload, list):
             return payload
@@ -412,6 +430,61 @@ class DataProvider:
             print(f"Error fetching latest bar for {code}: {e}")
             self.last_error = str(e)
         return None
+
+    def _normalize_minute_bar_row(self, bar):
+        if not isinstance(bar, dict):
+            return None
+        dt_val = pd.to_datetime(bar.get("dt"), errors="coerce")
+        if pd.isna(dt_val):
+            return None
+        code = str(bar.get("code", "") or "").strip().upper()
+        if not code:
+            return None
+        row = {
+            "code": code,
+            "trade_time": dt_val.strftime("%Y-%m-%d %H:%M:%S"),
+            "open": float(bar.get("open", bar.get("close", 0.0)) or 0.0),
+            "high": float(bar.get("high", bar.get("close", 0.0)) or 0.0),
+            "low": float(bar.get("low", bar.get("close", 0.0)) or 0.0),
+            "close": float(bar.get("close", 0.0) or 0.0),
+            "vol": float(bar.get("vol", bar.get("volume", 0.0)) or 0.0),
+            "amount": float(bar.get("amount", bar.get("turnover", 0.0)) or 0.0),
+        }
+        return row
+
+    def upsert_table_rows(self, table, rows, on_duplicate="update"):
+        if not self.base_url:
+            self.last_error = "default_api_url 未配置"
+            return 0
+        if not self.api_key:
+            self.last_error = "default_api_key 未配置"
+            return 0
+        if not isinstance(rows, list) or len(rows) <= 0:
+            return 0
+        payload = {
+            "on_duplicate": str(on_duplicate or "update"),
+            "rows": rows
+        }
+        response = self._request_post(f"/tables/{str(table)}/rows", payload, timeout=30)
+        if response is None:
+            return 0
+        try:
+            data = response.json()
+            rowcount = data.get("rowcount") if isinstance(data, dict) else None
+            if isinstance(rowcount, int):
+                self.last_error = ""
+                return rowcount
+        except Exception:
+            pass
+        self.last_error = ""
+        return len(rows)
+
+    def upsert_realtime_minute_bar(self, bar, on_duplicate="update"):
+        row = self._normalize_minute_bar_row(bar)
+        if row is None:
+            self.last_error = "invalid realtime bar payload"
+            return 0
+        return int(self.upsert_table_rows("dat_1mins", [row], on_duplicate=on_duplicate) or 0)
 
     def push_data_to_remote(self, data_list):
         """

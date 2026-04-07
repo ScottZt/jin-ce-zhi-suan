@@ -1,7 +1,7 @@
 {
   "system": {
-    "mode": "backtest",
-    "enable_live": false,
+    "mode": "live",
+    "enable_live": true,
     "initial_capital": 1000000,
     "log_level": "INFO",
     "server_host": "0.0.0.0",
@@ -24,13 +24,13 @@
   "data_provider": {
     "source": "tushare",
     "enable_fallback": false,
-    "tushare_token": "4ba065ecb8eebdebc93dffaef6bc051eeb3a98b46eb7d94fd697282f",
-    "default_api_key": "abc123",
-    "default_api_url": "https://suzuki-subsection-latter-brook.trycloudflare.com",
+    "tushare_token": "",
+    "default_api_key": "",
+    "default_api_url": "",
     "mysql_host": "127.0.0.1",
     "mysql_port": 3306,
     "mysql_user": "root",
-    "mysql_password": "123456",
+    "mysql_password": "",
     "mysql_database": "quantifydata",
     "mysql_charset": "utf8mb4",
     "mysql_pool_size": 6,
@@ -60,9 +60,9 @@
     "postgres_table_60min": "dat_60mins",
     "postgres_table_day": "dat_day",
     "backtest_cache_db_source": "",
-    "llm_api_url": "https://api.openai.com/v1",
+    "llm_api_url": "https://api.siliconflow.cn/v1",
     "llm_api_key": "",
-    "llm_model": "gpt-4o-mini",
+    "llm_model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
     "strategy_llm_api_url": "https://api.siliconflow.cn/v1",
     "strategy_llm_api_key": "",
     "strategy_llm_model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
@@ -264,6 +264,16 @@
   },
   "live_monitoring": {
     "sync_with_backtest_cost_model": true,
+    "realtime_sync_to_default": {
+      "enabled": true,
+      "sources": [
+        "tushare",
+        "akshare",
+        "mysql",
+        "postgresql"
+      ],
+      "on_duplicate": "update"
+    },
     "consistency_checks": {
       "enforce_adjustment_and_settlement_match": true,
       "signal_execution_delay_seconds_warn": 5,
@@ -319,7 +329,7 @@
       "system"
     ],
     "webhook_urls": [],
-    "feishu_webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/561e369f-0c2a-4e53-8a1d-977cb926a99d",
+    "feishu_webhook_url": "",
     "feishu_secret": "",
     "dedupe_window_seconds": 12,
     "timeout_sec": 5,

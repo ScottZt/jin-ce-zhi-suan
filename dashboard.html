@@ -5,18 +5,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>金策智算 智能交易决策控制台</title>
     
-    <!-- Tailwind CSS v3 -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script>
+        window.__frontendStaticAssetSkipAll = false;
+        window.__frontendStaticAssetDecisionKey = '__frontend_static_asset_allow_remote__';
+        window.__frontendStaticAssetAllowRemoteMap = (function () {
+            try {
+                const raw = localStorage.getItem(window.__frontendStaticAssetDecisionKey);
+                const parsed = raw ? JSON.parse(raw) : {};
+                return parsed && typeof parsed === 'object' ? parsed : {};
+            } catch (_) {
+                return {};
+            }
+        })();
+        window.__frontendStaticAssetSaveDecision = function () {
+            try {
+                localStorage.setItem(
+                    window.__frontendStaticAssetDecisionKey,
+                    JSON.stringify(window.__frontendStaticAssetAllowRemoteMap || {})
+                );
+            } catch (_) {}
+        };
+        window.__frontendStaticAssetTryCache = async function (relativePath, remoteUrl) {
+            try {
+                const res = await fetch('/api/frontend/cache_asset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ relative_path: relativePath, remote_url: remoteUrl })
+                });
+                const data = await res.json();
+                if (res.ok && data && data.status === 'success' && data.local_url) {
+                    return `${data.local_url}?v=${Date.now()}`;
+                }
+            } catch (_) {}
+            return '';
+        };
+        window.__frontendStaticAssetHandleError = async function (el, localPath, remoteUrl, label) {
+            if (!el || !remoteUrl || !localPath) return;
+            if (window.__frontendStaticAssetSkipAll) return;
+            const showLabel = String(label || '静态资源');
+            const decisionMap = window.__frontendStaticAssetAllowRemoteMap || {};
+            const hasAllowed = decisionMap[localPath] === true;
+            if (!hasAllowed) {
+                const useRemote = window.confirm(`${showLabel} 本地缓存不存在，是否联网加载？\n点击“取消”将跳过后续外部资源加载提示。`);
+                if (!useRemote) {
+                    window.__frontendStaticAssetSkipAll = true;
+                    window.alert(`已跳过外部资源加载。当前页面可能缺少 ${showLabel} 的样式或功能。`);
+                    return;
+                }
+                decisionMap[localPath] = true;
+                window.__frontendStaticAssetSaveDecision();
+            }
+            const cachedLocalUrl = await window.__frontendStaticAssetTryCache(localPath, remoteUrl);
+            const finalUrl = cachedLocalUrl || remoteUrl;
+            if (el.tagName === 'LINK') {
+                el.onerror = null;
+                el.href = finalUrl;
+                return;
+            }
+            if (el.tagName === 'SCRIPT') {
+                el.onerror = null;
+                el.src = finalUrl;
+            }
+        };
+    </script>
+    <script src="/static/vendor/tailwindcss/tailwindcss.cdn.js" onerror="window.__frontendStaticAssetHandleError(this, 'vendor/tailwindcss/tailwindcss.cdn.js', 'https://cdn.tailwindcss.com', 'Tailwind CSS')"></script>
+    <link rel="stylesheet" href="/static/vendor/font-awesome/6.4.0/css/all.min.css" onerror="window.__frontendStaticAssetHandleError(this, 'vendor/font-awesome/6.4.0/css/all.min.css', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', 'Font Awesome 图标')">
+    <link href="/static/vendor/google-fonts/inter-jetbrains.css" rel="stylesheet" onerror="window.__frontendStaticAssetHandleError(this, 'vendor/google-fonts/inter-jetbrains.css', 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap', 'Google Fonts')">
+    <script src="/static/vendor/lightweight-charts/lightweight-charts.standalone.production.js" onerror="window.__frontendStaticAssetHandleError(this, 'vendor/lightweight-charts/lightweight-charts.standalone.production.js', 'https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js', 'K线图组件')"></script>
 
     <script>
-        tailwind.config = {
+        window.tailwind = window.tailwind || {};
+        window.tailwind.config = {
             theme: {
                 extend: {
                     colors: {
@@ -55,6 +114,7 @@
         }
         
         /* Strategy Switch Overlay */
+        #disclaimer-overlay,
         #strategy-overlay, #backtest-overlay, #strategy-doc-overlay {
             position: fixed;
             top: 0;
@@ -73,9 +133,23 @@
             transition: opacity 0.3s ease;
         }
         
+        #disclaimer-overlay.active,
         #strategy-overlay.active, #backtest-overlay.active, #strategy-doc-overlay.active {
             opacity: 1;
             pointer-events: all;
+        }
+
+        #disclaimer-overlay {
+            z-index: 200;
+        }
+
+        #disclaimer-card {
+            background: rgba(15, 23, 42, 0.98);
+            border: 1px solid rgba(59, 130, 246, 0.45);
+            box-shadow: 0 16px 40px rgba(2, 6, 23, 0.55);
+            width: min(920px, 92vw);
+            max-height: 86vh;
+            overflow-y: auto;
         }
 
         #backtest-results {
@@ -204,6 +278,40 @@
     </style>
 </head>
 <body class="h-screen flex flex-col text-sm antialiased selection:bg-trading-blue selection:text-white">
+
+    <div id="disclaimer-overlay" class="active">
+        <div id="disclaimer-card" class="rounded-xl p-6 md:p-8">
+            <div class="text-2xl md:text-3xl font-extrabold text-white tracking-wide text-center">金策智算 · 量化研究工具</div>
+            <div class="text-lg md:text-xl text-blue-300 font-bold text-center mt-2">免责声明与用户使用协议</div>
+            <div class="mt-6 space-y-4 text-slate-200 leading-7">
+                <p class="text-amber-300 font-semibold">重要提示：本软件及配套程序、数据、策略代码、回测引擎（统称“本工具”）为开源量化研究与历史数据回测工具，仅面向金融知识学习、策略逻辑验证、量化技术研究用途，不构成任何投资建议。</p>
+                <p class="text-white font-semibold">一、工具性质声明</p>
+                <p>1. 本工具仅提供历史行情数据展示、统计计算、策略回测、代码调试、技术分析研究功能。</p>
+                <p>2. 本工具不提供任何证券买卖点位推荐、不推荐具体股票/基金/期货等标的、不预测价格走势、不提供投资决策依据。</p>
+                <p>3. 本工具不属于荐股软件、不属于投资咨询软件、不属于智能交易决策软件。</p>
+                <p class="text-white font-semibold">二、风险提示</p>
+                <p>1. 证券、期货、基金等投资行为存在高风险，历史回测结果不代表未来收益，不代表策略有效性。</p>
+                <p>2. 任何基于本工具生成的回测报告、指标结果、信号图表、策略参数，均不能作为实盘交易依据。</p>
+                <p>3. 用户因使用本工具进行实盘交易所产生的任何盈利、亏损、纠纷、损失、民事赔偿、行政处罚、刑事责任，均由用户自行承担全部责任。</p>
+                <p class="text-white font-semibold">三、开发者责任免除（含民宿、茶馆、线下场所）</p>
+                <p>1. 本工具开发者（金策智算及相关主体）不具备证券投资咨询业务资质，不对外开展证券投资咨询活动，不提供任何形式的投资建议。</p>
+                <p>2. 开发者不对任何第三方使用本工具的行为承担法律责任，包括但不限于：个人用户、机构用户、散户社群；茶馆、会所、股民交流场所、线下投研空间；民宿、酒店、公寓、出租屋等住宿经营场所；经销商、合作方、代理商、推广渠道；任何商业或非商业场所、平台、社群。</p>
+                <p>3. 上述第三方（含民宿、茶馆等）以“金策智算”名义开展的收费荐股、投资指导、收益承诺、会员费、分成、代客理财、直播分析、线下教学等经营活动，均属其独立行为；开发者不知情、不授权、不参与、不控制、不获益、不承担任何连带责任（包括民事赔偿、行政处罚、刑事责任）。</p>
+                <p>4. 本工具为开源发布，开发者不对软件稳定性、连续性、安全性做出任何承诺，因软件使用导致的数据丢失、设备故障、系统异常、经济损失等问题，开发者不承担任何法律责任。</p>
+                <p class="text-white font-semibold">四、用户义务与承诺</p>
+                <p>用户勾选同意即视为已充分理解并承诺：1）本人已明确知晓本工具仅为量化学习与研究用途，不用于任何非法证券活动、违规荐股、收费投资指导、代客理财；2）本人具备相应金融投资风险识别能力与承受能力，自愿承担所有使用风险与法律责任；3）本人不利用本工具从事违反《证券法》《期货交易管理条例》《证券投资咨询业务管理暂行规定》等法律法规的活动；4）本人知晓并同意：开发者不对任何用户或第三方（含民宿、茶馆、线下场所等）的盈亏、纠纷、民事索赔、行政处罚、刑事责任承担任何责任。</p>
+                <p class="text-white font-semibold">五、最终解释与法律适用</p>
+                <p>1. 本声明为开源软件使用条件，构成用户使用本工具的前提。</p>
+                <p>2. 因本工具产生的争议，适用中华人民共和国法律管辖。</p>
+            </div>
+            <label class="mt-8 flex items-start gap-3 cursor-pointer select-none">
+                <input id="disclaimer-agree-checkbox" type="checkbox" class="mt-1 w-4 h-4 accent-blue-500">
+                <span class="text-white font-semibold">我已阅读并同意以上免责声明与用户使用协议，自愿承担全部风险</span>
+            </label>
+            <div class="text-xs text-slate-400 mt-2">（勾选后方可进入系统）</div>
+            <button id="disclaimer-enter-btn" type="button" class="mt-6 w-full bg-blue-600/50 text-white py-2.5 rounded-lg font-bold cursor-not-allowed opacity-60 transition-all" disabled>进入系统</button>
+        </div>
+    </div>
 
     <!-- Strategy Switch Overlay -->
     <div id="strategy-overlay">
@@ -1386,6 +1494,7 @@
         let rightPanelPrefs = { strategy: true, console: true, stream: true };
         let rightLayoutPreset = 'balanced';
         let liveFundPoolSelectedCode = '';
+        let liveFundPoolSelectionTouched = false;
         let liveFundTradeRows = [];
         let liveFundLastFetchAt = 0;
         let liveFundCurveMetric = 'fund_value';
@@ -1506,6 +1615,9 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         let backtestMonitorErrorCount = 0;
         let backtestNoRunningTicks = 0;
         let backtestStreamClosed = false;
+        let currentBacktestReportId = '';
+        let backtestStartInFlight = false;
+        let disclaimerAccepted = false;
         const STRATEGY_GUIDE = {
             all: {
                 name: '全部策略总览',
@@ -1851,7 +1963,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     }
                     break;
                 case 'init_strategies':
-                    updateStrategyList(data);
+                    applyLiveStrategySelection(data);
                     logMessage('SYSTEM', `已加载 ${data.length} 套内阁策略`, 'system');
                     break;
                 case 'market':
@@ -2038,6 +2150,33 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             }
         }
 
+        function syncStrategySelectionUI() {
+            const selectedSet = new Set((selectedStrategyIds || []).map(x => String(x)));
+            document.querySelectorAll('.strategy-item-checkbox').forEach(cb => {
+                cb.checked = selectedSet.has(String(cb.value));
+            });
+            const allBox = document.getElementById('strategy-all-checkbox');
+            if (allBox) allBox.checked = selectedStrategyIds.length === strategyCatalog.length && strategyCatalog.length > 0;
+            renderStrategySelectionSummary();
+            updateStrategyQuick(selectedStrategyIds.length === 1 ? String(selectedStrategyIds[0]) : 'all');
+        }
+
+        function applyLiveStrategySelection(strategies) {
+            const runtimeIds = (Array.isArray(strategies) ? strategies : [])
+                .map(s => String(s?.id || '').trim())
+                .filter(Boolean);
+            if (!runtimeIds.length) return;
+            if (!Array.isArray(strategyCatalog) || !strategyCatalog.length) {
+                fetchGlobalStrategies();
+                return;
+            }
+            const allowSet = new Set(strategyCatalog.map(s => String(s.id)));
+            const picked = runtimeIds.filter(id => allowSet.has(id));
+            if (!picked.length) return;
+            selectedStrategyIds = Array.from(new Set(picked));
+            syncStrategySelectionUI();
+        }
+
         function updateStrategyList(strategies, preserveSelection = false) {
             const prevSelected = Array.isArray(selectedStrategyIds) ? selectedStrategyIds.slice() : [];
             strategyCatalog = Array.isArray(strategies) ? strategies.slice() : [];
@@ -2088,10 +2227,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     list.appendChild(row);
                 });
             }
-            const allBox = document.getElementById('strategy-all-checkbox');
-            if (allBox) allBox.checked = selectedStrategyIds.length === strategyCatalog.length && strategyCatalog.length > 0;
-            renderStrategySelectionSummary();
-            updateStrategyQuick(selectedStrategyIds.length === 1 ? String(selectedStrategyIds[0]) : 'all');
+            syncStrategySelectionUI();
         }
 
         function toggleStrategyPanel() {
@@ -2801,7 +2937,10 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (!sel) return;
             const existed = new Set();
             const codes = Object.keys(DIAG_STATE.liveFundPools || {}).sort((a, b) => String(a).localeCompare(String(b)));
-            const keep = liveFundPoolSelectedCode || fundPoolSelectedCodeFallback();
+            const preferPortfolioOnInit = !liveFundPoolSelectionTouched && codes.length > 1;
+            const keep = preferPortfolioOnInit
+                ? FUND_POOL_PORTFOLIO_KEY
+                : (liveFundPoolSelectedCode || fundPoolSelectedCodeFallback());
             sel.innerHTML = '';
             if (codes.length > 1) {
                 const optAll = document.createElement('option');
@@ -3301,6 +3440,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
 
         function onFundPoolStockChange(code) {
             liveFundPoolSelectedCode = String(code || '').toUpperCase();
+            liveFundPoolSelectionTouched = true;
             if (liveFundPoolSelectedCode === FUND_POOL_PORTFOLIO_KEY) {
                 renderFundPoolPanel(buildPortfolioFundPoolSnapshot(), FUND_POOL_PORTFOLIO_KEY);
                 return;
@@ -5580,7 +5720,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (statusSyncInFlight) return;
             statusSyncInFlight = true;
             try {
-                const res = await fetch('/api/status');
+                const res = await fetch('/api/status/light');
                 const data = await res.json();
                 liveEnabled = data.live_enabled !== false;
                 const runningCodes = Array.isArray(data.live_running_codes) ? data.live_running_codes : [];
@@ -5589,6 +5729,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 liveRunning = (liveRunningByStatus || liveByCabinet);
                 if (liveRunning) liveActionPending = false;
                 const reportStatus = String(data.current_report_status || '').toLowerCase();
+                const statusReportId = String(data.current_report_id || '').trim();
                 const reportError = data.current_report_error;
                 liveLastError = (data.live_last_error && typeof data.live_last_error === 'object') ? data.live_last_error : null;
                 const progressVal = Number((data.progress || {}).progress || 0);
@@ -5596,10 +5737,15 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 const successLike = ['success', 'succeeded', 'completed', 'done'].includes(reportStatus);
                 const stoppedLike = (!isBacktestRunning && progressVal >= 100) || (!data.is_running && reportStatus && reportStatus !== 'running');
                 if (backtestBtnState === BACKTEST_BTN_STATE.running) {
-                    if (reportStatus === 'failed' || reportError) {
-                        setBacktestButtonState(BACKTEST_BTN_STATE.error);
-                    } else if (successLike || stoppedLike) {
-                        setBacktestButtonState(BACKTEST_BTN_STATE.idle);
+                    const reportTracked = currentBacktestReportId
+                        ? statusReportId === currentBacktestReportId
+                        : !backtestStartInFlight;
+                    if (reportTracked) {
+                        if (reportStatus === 'failed' || reportError) {
+                            setBacktestButtonState(BACKTEST_BTN_STATE.error);
+                        } else if (successLike || stoppedLike) {
+                            setBacktestButtonState(BACKTEST_BTN_STATE.idle);
+                        }
                     }
                 }
                 const sourceSel = document.getElementById('source-select');
@@ -5616,8 +5762,10 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 applyLiveVisibility();
                 renderLiveStatus();
                 renderLiveExceptionPanel();
-                await refreshHistorySyncStatus();
-                await syncBoardConfig();
+                await Promise.allSettled([
+                    refreshHistorySyncStatus(),
+                    syncBoardConfig()
+                ]);
             } catch (_) {
             } finally {
                 statusSyncInFlight = false;
@@ -5990,6 +6138,8 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 return;
             }
             btn.disabled = false;
+            backtestStartInFlight = false;
+            currentBacktestReportId = '';
             backtestNoRunningTicks = 0;
             if (state === BACKTEST_BTN_STATE.error) {
                 btn.className = 'bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded font-bold text-sm transition-all border border-red-500 min-w-[128px]';
@@ -6009,17 +6159,21 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 if (!res.ok) throw new Error(`status ${res.status}`);
                 const data = await res.json();
                 const reportStatus = String(data.current_report_status || '').toLowerCase();
+                const statusReportId = String(data.current_report_id || '').trim();
                 const reportError = data.current_report_error;
                 const progressObj = (data.progress && typeof data.progress === 'object') ? data.progress : {};
                 const progressVal = Number(progressObj.progress || 0);
                 const progressDate = String(progressObj.current_date || '--');
                 const activeType = String(data.active_cabinet_type || '').toLowerCase();
+                const reportTracked = currentBacktestReportId
+                    ? statusReportId === currentBacktestReportId
+                    : !backtestStartInFlight;
                 const isBacktestRunning = Boolean(
-                    data.is_running && (
+                    reportTracked && data.is_running && (
                         activeType.includes('backtest')
                         || reportStatus === 'running'
                         || progressVal > 0
-                        || Boolean(data.current_report_id)
+                        || Boolean(statusReportId)
                     )
                 );
                 if (isBacktestRunning) {
@@ -6028,25 +6182,25 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 } else {
                     backtestNoRunningTicks += 1;
                 }
-                if (reportStatus === 'failed' || reportError) {
+                if (reportTracked && (reportStatus === 'failed' || reportError)) {
                     closeBacktestStream();
                     logMessage('回测', reportError || '回测任务异常终止', 'danger');
                     setBacktestButtonState(BACKTEST_BTN_STATE.error);
                     return;
                 }
-                if (reportStatus === 'cancelled') {
+                if (reportTracked && reportStatus === 'cancelled') {
                     closeBacktestStream();
                     logMessage('回测', '回测已终止', 'warning');
                     setBacktestButtonState(BACKTEST_BTN_STATE.idle);
                     return;
                 }
                 const successLike = ['success', 'succeeded', 'completed', 'done'].includes(reportStatus);
-                const finishedBySnapshot = !isBacktestRunning && (
+                const finishedBySnapshot = reportTracked && !isBacktestRunning && (
                     successLike
                     || progressVal >= 100
-                    || (backtestNoRunningTicks >= 2 && Boolean(data.current_report_id || progressVal > 0))
+                    || (backtestNoRunningTicks >= 2 && Boolean(statusReportId || progressVal > 0))
                 );
-                if (successLike || finishedBySnapshot) {
+                if ((reportTracked && successLike) || finishedBySnapshot) {
                     closeBacktestStream();
                     if (!backtestResultRecovered) {
                         await recoverBacktestResultFromApi();
@@ -6083,10 +6237,16 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             return data;
         }
 
-        async function recoverBacktestResultFromApi() {
+        async function recoverBacktestResultFromApi(reportId = '') {
             try {
-                const res = await fetch('/api/report/latest');
+                const targetReportId = String(reportId || currentBacktestReportId || '').trim();
+                const reportApi = targetReportId
+                    ? `/api/report/${encodeURIComponent(targetReportId)}`
+                    : '/api/report/latest';
+                const res = await fetch(reportApi);
                 const data = await res.json();
+                const resultReportId = String(data?.report_id || '').trim();
+                if (targetReportId && resultReportId && resultReportId !== targetReportId) return;
                 if (data && data.summary) {
                     if (Array.isArray(data.strategy_reports)) {
                         strategyReportsBuffer = data.strategy_reports;
@@ -6165,6 +6325,8 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (bar) bar.style.width = '0%';
             const timeEl = document.getElementById('war-time');
             if (timeEl) timeEl.innerText = '--';
+            currentBacktestReportId = '';
+            backtestStartInFlight = true;
             setBacktestButtonState(BACKTEST_BTN_STATE.running);
             try {
                 const reqPayload = {
@@ -6176,8 +6338,12 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     capital: capital
                 };
                 const startResp = await startBacktestByApi(reqPayload);
+                currentBacktestReportId = String(startResp.report_id || '').trim();
+                backtestStartInFlight = false;
                 logMessage('回测', `任务已提交 report_id=${startResp.report_id || '--'}`, 'system');
             } catch (e) {
+                backtestStartInFlight = false;
+                currentBacktestReportId = '';
                 logMessage('回测', `启动失败: ${e}`, 'danger');
                 setBacktestButtonState(BACKTEST_BTN_STATE.error);
             }
@@ -7094,10 +7260,35 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 }
             }
         }
+
+        function updateDisclaimerAccess() {
+            const overlay = document.getElementById('disclaimer-overlay');
+            const checkbox = document.getElementById('disclaimer-agree-checkbox');
+            const enterBtn = document.getElementById('disclaimer-enter-btn');
+            if (!overlay || !checkbox || !enterBtn) return;
+            disclaimerAccepted = !!checkbox.checked;
+            enterBtn.disabled = !disclaimerAccepted;
+            if (disclaimerAccepted) {
+                enterBtn.classList.remove('cursor-not-allowed', 'opacity-60', 'bg-blue-600/50');
+                enterBtn.classList.add('hover:bg-blue-500', 'bg-blue-600');
+            } else {
+                enterBtn.classList.add('cursor-not-allowed', 'opacity-60', 'bg-blue-600/50');
+                enterBtn.classList.remove('hover:bg-blue-500', 'bg-blue-600');
+            }
+        }
+
+        function enterSystemByDisclaimer() {
+            const overlay = document.getElementById('disclaimer-overlay');
+            if (!overlay || !disclaimerAccepted) return;
+            overlay.classList.remove('active');
+        }
         
         // Initial Log
         logMessage('SYSTEM', '控制台就绪，等待连接...', 'info');
         restoreConsoleState();
+        updateDisclaimerAccess();
+        document.getElementById('disclaimer-agree-checkbox')?.addEventListener('change', updateDisclaimerAccess);
+        document.getElementById('disclaimer-enter-btn')?.addEventListener('click', enterSystemByDisclaimer);
         document.getElementById('kline-modal')?.addEventListener('click', (e) => {
             if (e.target && e.target.id === 'kline-modal') closeKlineModal();
         });
