@@ -12,6 +12,8 @@ param(
     [switch]$SkipPublicPush,
     [switch]$SkipPrivatePush,
     [switch]$StrictPublicPush,
+    [int]$GitHttpConnectTimeoutSeconds = 90,
+    [int]$GitHttpLowSpeedTimeSeconds = 180,
     [switch]$DryRun
 )
 
@@ -23,7 +25,19 @@ function Invoke-Git {
         [switch]$AllowFailure,
         [switch]$ReadOnly
     )
-    $display = $Args -join " "
+    $effectiveArgs = @($Args)
+    if ($effectiveArgs.Count -gt 0) {
+        $networkActions = @("push", "fetch", "pull", "clone", "ls-remote")
+        if ($networkActions -contains $effectiveArgs[0]) {
+            if ($GitHttpConnectTimeoutSeconds -gt 0) {
+                $effectiveArgs = @("-c", "http.connectTimeout=$GitHttpConnectTimeoutSeconds") + $effectiveArgs
+            }
+            if ($GitHttpLowSpeedTimeSeconds -gt 0) {
+                $effectiveArgs = @("-c", "http.lowSpeedLimit=1", "-c", "http.lowSpeedTime=$GitHttpLowSpeedTimeSeconds") + $effectiveArgs
+            }
+        }
+    }
+    $display = $effectiveArgs -join " "
     if ($DryRun -and -not $ReadOnly) {
         Write-Host "[DRY-RUN] git $display"
         return @{
@@ -34,7 +48,7 @@ function Invoke-Git {
     $originalErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = "Continue"
-        $output = & git @Args 2>&1
+        $output = & git @effectiveArgs 2>&1
     }
     finally {
         $ErrorActionPreference = $originalErrorActionPreference
