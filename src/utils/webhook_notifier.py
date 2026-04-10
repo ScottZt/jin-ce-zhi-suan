@@ -561,6 +561,35 @@ class WebhookNotifier:
                     f"**最大回撤**：<font color='{dd_color}'>{self._safe_text(max_dd_text)}</font>"
                 )}}
             ]
+            detail_rows = data.get("stock_summaries", [])
+            detail_rows = detail_rows if isinstance(detail_rows, list) else []
+            detail_lines = []
+            rank_idx = 0
+            for row in detail_rows:
+                if not isinstance(row, dict):
+                    continue
+                rank_idx += 1
+                row_code = str(row.get("stock_code", "") or "").strip().upper() or "--"
+                row_trades = int(row.get("total_trades", 0) or 0)
+                row_wr = self._to_percent_number(row.get("win_rate", None))
+                row_dd = self._to_percent_number(row.get("max_drawdown", None))
+                if row_dd is not None and abs(row_dd) <= 1.0:
+                    row_dd = row_dd * 100.0
+                row_pnl = self._to_float(row.get("net_pnl", row.get("realized_pnl", None)))
+                row_wr_text = "--" if row_wr is None else f"{row_wr:.2f}%"
+                row_dd_text = "--" if row_dd is None else f"{row_dd:.2f}%"
+                row_pnl_text = "--" if row_pnl is None else f"{row_pnl:.2f}"
+                detail_lines.append(
+                    f"{rank_idx}. `{self._safe_text(row_code)}`｜交易:`{row_trades}`｜胜率:`{self._safe_text(row_wr_text)}`｜净盈亏:`{self._safe_text(row_pnl_text)}`｜回撤:`{self._safe_text(row_dd_text)}`"
+                )
+            if detail_lines:
+                elements.append({
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": "**📋 按标的明细**\n" + "\n".join(detail_lines)
+                    }
+                })
         if msg:
             elements.append({
                 "tag": "note",
@@ -812,7 +841,7 @@ class WebhookNotifier:
             self._last_retry_ts = now_ts
             await self._retry_failed_once(cfg)
 
-    async def notify(self, event_type, data, stock_code):
+    async def notify(self, event_type, data, stock_code, force=False):
         cfg = self._load_cfg()
         if not bool(cfg.get("enabled", False)):
             return
@@ -834,7 +863,7 @@ class WebhookNotifier:
         if not jobs:
             return
         dedupe_window_seconds = float(cfg.get("dedupe_window_seconds", 12) or 12)
-        if not self._should_send(event_type, stock_code, data, dedupe_window_seconds):
+        if (not bool(force)) and (not self._should_send(event_type, stock_code, data, dedupe_window_seconds)):
             return
         timeout_sec = float(cfg.get("timeout_sec", 5) or 5)
         max_retries = max(0, int(cfg.get("max_retries", 2) or 2))

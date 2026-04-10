@@ -150,6 +150,7 @@ live_capital_profiles: Dict[str, float] = {}
 live_capital_plan_mode: str = "equal"
 live_capital_plan_weights: Dict[str, float] = {}
 live_last_error: Optional[Dict[str, Any]] = None
+daily_summary_webhook_state: Dict[str, Dict[str, Any]] = {}
 current_provider_source = None
 latest_backtest_result = None
 latest_strategy_reports = {}
@@ -157,6 +158,9 @@ current_backtest_report = None
 current_backtest_progress = {"progress": 0, "current_date": None}
 current_backtest_trades = []
 kline_daily_cache = {}
+backtest_kline_payload_cache = {}
+BACKTEST_KLINE_PAYLOAD_CACHE_TTL_SECONDS = 8
+BACKTEST_KLINE_PAYLOAD_CACHE_MAX_ITEMS = 120
 report_strategy_kline_cache = {}
 report_ai_review_cache = {}
 strategy_score_cache = {}
@@ -710,6 +714,141 @@ def _should_notify_webhook_by_category(event_type, data):
     if mode == "whitelist":
         return cat in picked
     return cat not in picked
+
+def _daily_summary_day_text(data):
+    if isinstance(data, dict):
+        raw_date = str(data.get("date", "") or "").strip()
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", raw_date):
+            return raw_date
+    return datetime.now().strftime("%Y-%m-%d")
+
+def _merge_daily_summary_payload(day_text, summary_map, expected_codes):
+    target_codes = [str(x).strip().upper() for x in (expected_codes or []) if str(x).strip()]
+    if not target_codes:
+        target_codes = [str(x).strip().upper() for x in summary_map.keys() if str(x).strip()]
+    rows = []
+    for code in target_codes:
+        row = summary_map.get(code)
+        if isinstance(row, dict):
+            rows.append((code, row))
+    if not rows:
+        rows = [(str(code).strip().upper(), row) for code, row in summary_map.items() if isinstance(row, dict)]
+    total_trades = 0
+    total_net_pnl = 0.0
+    max_drawdown = 0.0
+    weighted_win_numerator = 0.0
+    weighted_win_denominator = 0
+    stock_summaries = []
+    for _, row in rows:
+        trades = int(row.get("total_trades", 0) or 0)
+        net_pnl = float(row.get("net_pnl", row.get("realized_pnl", 0.0)) or 0.0)
+        dd = float(row.get("max_drawdown", 0.0) or 0.0)
+        wr = float(row.get("win_rate", 0.0) or 0.0)
+        wr = max(0.0, wr)
+        dd = max(0.0, dd)
+        total_trades += max(0, trades)
+        total_net_pnl += net_pnl
+        max_drawdown = max(max_drawdown, dd)
+        stock_summaries.append({
+            "stock_code": str(row.get("stock_code", "") or "").strip().upper(),
+            "total_trades": int(max(0, trades)),
+            "win_rate": round(float(wr), 2),
+            "net_pnl": round(float(net_pnl), 2),
+            "max_drawdown": round(float(dd), 6)
+        })
+        if trades > 0:
+            weighted_win_numerator += wr * float(trades)
+            weighted_win_denominator += trades
+    if weighted_win_denominator > 0:
+        win_rate = weighted_win_numerator / float(weighted_win_denominator)
+    else:
+        win_rate = 0.0
+    used_codes = [code for code, _ in rows]
+    if len(stock_summaries) != len(used_codes):
+        stock_summaries = []
+        for code, row in rows:
+            trades = int(row.get("total_trades", 0) or 0)
+            net_pnl = float(row.get("net_pnl", row.get("realized_pnl", 0.0)) or 0.0)
+            dd = max(0.0, float(row.get("max_drawdown", 0.0) or 0.0))
+            wr = max(0.0, float(row.get("win_rate", 0.0) or 0.0))
+            stock_summaries.append({
+                "stock_code": str(code).strip().upper(),
+                "total_trades": int(max(0, trades)),
+                "win_rate": round(float(wr), 2),
+                "net_pnl": round(float(net_pnl), 2),
+                "max_drawdown": round(float(dd), 6)
+            })
+    return {
+        "date": day_text,
+        "event_type": "daily_summary",
+        "total_trades": int(total_trades),
+        "win_rate": round(float(win_rate), 2),
+        "net_pnl": round(float(total_net_pnl), 2),
+        "max_drawdown": round(float(max_drawdown), 6),
+        "stock_count": len(used_codes),
+        "stock_codes": used_codes,
+        "stock_summaries": stock_summaries
+    }
+
+async def _notify_daily_summary_once(stock_code, data):
+    global daily_summary_webhook_state
+    if not isinstance(data, dict):
+        if _should_notify_webhook_by_category(event_type="daily_summary", data=data):
+            await webhook_notifier.notify(event_type="daily_summary", data=data, stock_code=stock_code)
+        return
+    code = str(stock_code or "").strip().upper()
+    if not code:
+        code = "MULTI"
+    day_text = _daily_summary_day_text(data)
+    state = daily_summary_webhook_state.get(day_text)
+    if not isinstance(state, dict):
+        state = {"sent": False, "first_seen_at": datetime.now(), "summaries": {}}
+    summaries = state.get("summaries")
+    if not isinstance(summaries, dict):
+        summaries = {}
+    summaries[code] = dict(data)
+    state["summaries"] = summaries
+    if bool(state.get("sent", False)):
+        daily_summary_webhook_state[day_text] = state
+        return
+    running_codes = [str(x or "").strip().upper() for x in _live_running_codes() if str(x or "").strip()]
+    expected_codes = running_codes if running_codes else list(summaries.keys())
+    first_seen_at = state.get("first_seen_at")
+    timed_out = isinstance(first_seen_at, datetime) and (datetime.now() - first_seen_at >= timedelta(seconds=20))
+    has_all = all(code_item in summaries for code_item in expected_codes)
+    if (not has_all) and (not timed_out):
+        daily_summary_webhook_state[day_text] = state
+        return
+    merged = _merge_daily_summary_payload(day_text=day_text, summary_map=summaries, expected_codes=expected_codes)
+    state["sent"] = True
+    daily_summary_webhook_state[day_text] = state
+    if len(daily_summary_webhook_state) > 30:
+        keep_days = set(sorted(daily_summary_webhook_state.keys())[-10:])
+        daily_summary_webhook_state = {k: v for k, v in daily_summary_webhook_state.items() if k in keep_days}
+    notify_stock_code = "MULTI" if len(merged.get("stock_codes", [])) != 1 else str(merged.get("stock_codes")[0] or "MULTI")
+    if _should_notify_webhook_by_category(event_type="daily_summary", data=merged):
+        await webhook_notifier.notify(event_type="daily_summary", data=merged, stock_code=notify_stock_code)
+
+def _resolve_daily_summary_for_manual_repush(day_text=None):
+    day = str(day_text or "").strip()
+    if day:
+        state = daily_summary_webhook_state.get(day)
+        if not isinstance(state, dict):
+            return None, "", f"指定日期无日终汇总缓存: {day}"
+        summaries = state.get("summaries")
+        if not isinstance(summaries, dict) or (not summaries):
+            return None, "", f"指定日期无明细缓存: {day}"
+        payload = _merge_daily_summary_payload(day, summaries, list(summaries.keys()))
+        return payload, day, ""
+    if not daily_summary_webhook_state:
+        return None, "", "暂无可重推的日终汇总缓存"
+    latest_day = sorted(daily_summary_webhook_state.keys())[-1]
+    state = daily_summary_webhook_state.get(latest_day)
+    summaries = state.get("summaries") if isinstance(state, dict) else None
+    if not isinstance(summaries, dict) or (not summaries):
+        return None, "", f"最近日期无明细缓存: {latest_day}"
+    payload = _merge_daily_summary_payload(latest_day, summaries, list(summaries.keys()))
+    return payload, latest_day, ""
 
 def _set_live_last_error(stock_code, stage, err, tb_text=None):
     global live_last_error
@@ -1306,7 +1445,7 @@ def _sanitize_non_finite(obj):
     return obj
 
 def start_new_backtest_report(stock_code, strategy_id, request_payload=None):
-    global current_backtest_report, latest_backtest_result, latest_strategy_reports, current_backtest_progress, current_backtest_trades
+    global current_backtest_report, latest_backtest_result, latest_strategy_reports, current_backtest_progress, current_backtest_trades, backtest_kline_payload_cache
     report_id = f"{int(datetime.now().timestamp() * 1000)}-{os.urandom(2).hex()}"
     current_backtest_report = {
         "report_id": report_id,
@@ -1324,6 +1463,7 @@ def start_new_backtest_report(stock_code, strategy_id, request_payload=None):
     latest_strategy_reports = {}
     current_backtest_progress = {"progress": 0, "current_date": None}
     current_backtest_trades = []
+    backtest_kline_payload_cache = {}
     return report_id
 
 def finalize_current_backtest_report():
@@ -1458,6 +1598,9 @@ class WebhookRetryRequest(BaseModel):
 
 class WebhookDeleteRequest(BaseModel):
     event_ids: Optional[list[str]] = None
+
+class WebhookDailySummaryRepushRequest(BaseModel):
+    date: Optional[str] = None
 
 class ConfigUpdateRequest(BaseModel):
     config: dict
@@ -4189,6 +4332,65 @@ def _cache_key_daily(stock_code, start_dt, end_dt):
     return f"{stock_code}|{start_dt.strftime('%Y-%m-%d')}|{end_dt.strftime('%Y-%m-%d')}"
 
 
+def _backtest_progress_cache_key(end_dt):
+    raw = current_backtest_progress.get("current_date")
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    lowered = text.lower()
+    if lowered == "done":
+        return pd.to_datetime(end_dt).strftime("%Y-%m-%d")
+    if lowered == "failed":
+        return "failed"
+    return text
+
+
+def _cache_key_backtest_payload(stock_code, start_dt, end_dt, progress_key):
+    s = pd.to_datetime(start_dt).strftime("%Y-%m-%d")
+    e = pd.to_datetime(end_dt).strftime("%Y-%m-%d")
+    return f"{stock_code}|{s}|{e}|{progress_key}"
+
+
+def _get_cached_backtest_kline_payload(cache_key):
+    cached = backtest_kline_payload_cache.get(cache_key)
+    if not isinstance(cached, dict):
+        return None
+    expires_at = float(cached.get("expires_at", 0.0) or 0.0)
+    now_ts = datetime.now().timestamp()
+    if expires_at > 0 and now_ts <= expires_at:
+        payload = cached.get("payload")
+        if isinstance(payload, dict):
+            return payload
+    backtest_kline_payload_cache.pop(cache_key, None)
+    return None
+
+
+def _set_cached_backtest_kline_payload(cache_key, payload):
+    if not isinstance(payload, dict):
+        return
+    now_ts = datetime.now().timestamp()
+    backtest_kline_payload_cache[cache_key] = {
+        "payload": payload,
+        "expires_at": now_ts + float(BACKTEST_KLINE_PAYLOAD_CACHE_TTL_SECONDS)
+    }
+    while len(backtest_kline_payload_cache) > int(BACKTEST_KLINE_PAYLOAD_CACHE_MAX_ITEMS):
+        first_key = next(iter(backtest_kline_payload_cache))
+        if first_key == cache_key and len(backtest_kline_payload_cache) == 1:
+            break
+        backtest_kline_payload_cache.pop(first_key, None)
+
+
+def _invalidate_backtest_kline_payload_cache(stock_code=None):
+    if not stock_code:
+        backtest_kline_payload_cache.clear()
+        return
+    norm = _normalize_symbol(stock_code)
+    prefix = f"{norm}|"
+    keys = [k for k in backtest_kline_payload_cache.keys() if str(k).startswith(prefix)]
+    for k in keys:
+        backtest_kline_payload_cache.pop(k, None)
+
+
 def _get_cached_daily_df(stock_code, start_dt, end_dt):
     key = _cache_key_daily(stock_code, start_dt, end_dt)
     cached = kline_daily_cache.get(key)
@@ -4378,9 +4580,15 @@ async def api_backtest_kline_data(stock: str, start: str, end: str):
         end_dt = pd.to_datetime(end)
         if pd.isna(start_dt) or pd.isna(end_dt) or start_dt > end_dt:
             return {"status": "error", "msg": "invalid date range"}
+        progress_key = _backtest_progress_cache_key(end_dt)
+        cache_key = _cache_key_backtest_payload(stock_code, start_dt, end_dt, progress_key)
+        cached_payload = _get_cached_backtest_kline_payload(cache_key)
+        if isinstance(cached_payload, dict):
+            return {"status": "success", "stock": stock_code, **cached_payload}
         payload = _build_backtest_kline_payload(stock_code, start_dt, end_dt)
         if payload is None:
             return {"status": "error", "msg": "no data"}
+        _set_cached_backtest_kline_payload(cache_key, payload)
         return {"status": "success", "stock": stock_code, **payload}
     except Exception as e:
         logger.error(f"/api/backtest/kline_data failed: {e}", exc_info=True)
@@ -4866,6 +5074,34 @@ async def api_webhook_delete_failed(req: WebhookDeleteRequest):
         return {"status": "success", "result": result, "events": events, "count": len(events)}
     except Exception as e:
         logger.error("delete webhook failed queue error: %s", e, exc_info=True)
+        return {"status": "error", "msg": str(e)}
+
+@app.post("/api/webhook/daily_summary/repush")
+async def api_webhook_repush_daily_summary(req: WebhookDailySummaryRepushRequest):
+    if not is_live_enabled():
+        return {"status": "error", "msg": "当前为回测模式，手动重复推送仅在实盘模式可用"}
+    try:
+        payload, day_text, err = _resolve_daily_summary_for_manual_repush(req.date)
+        if payload is None:
+            return {"status": "error", "msg": err or "暂无可重推的日终汇总"}
+        stock_codes = payload.get("stock_codes", [])
+        stock_codes = stock_codes if isinstance(stock_codes, list) else []
+        notify_stock_code = "MULTI" if len(stock_codes) != 1 else str(stock_codes[0] or "MULTI")
+        await webhook_notifier.notify(
+            event_type="daily_summary",
+            data=payload,
+            stock_code=notify_stock_code,
+            force=True
+        )
+        return {
+            "status": "success",
+            "msg": f"日终汇总已手动重复推送: {day_text}",
+            "date": day_text,
+            "stock_count": int(payload.get("stock_count", len(stock_codes)) or 0),
+            "stock_codes": stock_codes
+        }
+    except Exception as e:
+        logger.error("manual repush daily_summary failed: %s", e, exc_info=True)
         return {"status": "error", "msg": str(e)}
 
 def _history_sync_payload_from_request(req: HistorySyncRunRequest):
@@ -5392,6 +5628,7 @@ async def emit_event_to_ws(event_type, data, stock_code=None, report_id=None, br
             emit_data["stock_code"] = stock_code
     if event_type == "backtest_result":
         latest_backtest_result = emit_data
+        _invalidate_backtest_kline_payload_cache()
         if current_backtest_report is not None:
             current_backtest_report["summary"] = emit_data
             current_backtest_report["ranking"] = emit_data.get("ranking", [])
@@ -5412,6 +5649,7 @@ async def emit_event_to_ws(event_type, data, stock_code=None, report_id=None, br
     elif event_type == "backtest_failed":
         msg = emit_data.get("msg") if isinstance(emit_data, dict) else str(emit_data)
         fail_current_backtest_report(msg)
+        _invalidate_backtest_kline_payload_cache()
         current_backtest_progress = {"progress": current_backtest_progress.get("progress", 0), "current_date": "Failed"}
     elif event_type == "backtest_strategy_report":
         sid = str(emit_data.get("strategy_id", ""))
@@ -5429,6 +5667,7 @@ async def emit_event_to_ws(event_type, data, stock_code=None, report_id=None, br
                 "price": float(emit_data.get("price", 0.0) or 0.0),
                 "qty": int(emit_data.get("qty", 0) or 0)
             })
+            _invalidate_backtest_kline_payload_cache(stock_code=emit_data.get("code", ""))
     elif event_type == "backtest_flow":
         if isinstance(emit_data, dict) and str(emit_data.get("module", "")).strip() == "工部":
             flow_msg = str(emit_data.get("msg", "") or "").strip()
@@ -5458,7 +5697,9 @@ async def emit_event_to_ws(event_type, data, stock_code=None, report_id=None, br
     if broadcast_ws:
         await manager.broadcast(payload)
     if stock_code and event_type != "system":
-        if _should_notify_webhook_by_category(event_type=event_type, data=emit_data):
+        if event_type == "daily_summary":
+            await _notify_daily_summary_once(stock_code=stock_code, data=emit_data)
+        elif _should_notify_webhook_by_category(event_type=event_type, data=emit_data):
             await webhook_notifier.notify(event_type=event_type, data=emit_data, stock_code=stock_code)
 
 async def _broadcast_system_and_notify(msg: str, stock_codes=None):

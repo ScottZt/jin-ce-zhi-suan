@@ -1502,6 +1502,7 @@
                 <div id="webhook-retry-status" class="text-xs text-slate-400">待加载</div>
                 <div class="flex items-center gap-2">
                     <button onclick="reloadWebhookFailedEvents()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-xs border border-slate-600">刷新</button>
+                    <button onclick="repushLatestDailySummary()" class="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-1.5 rounded text-xs border border-indigo-500">重复推送日终汇总</button>
                     <button onclick="retrySelectedWebhookEvents()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded text-xs border border-emerald-500">重推选中</button>
                     <button onclick="retryAllWebhookEvents()" class="bg-amber-700 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-xs border border-amber-500">重推前20条</button>
                     <button onclick="clearSelectedWebhookEvents()" class="bg-rose-700 hover:bg-rose-600 text-white px-3 py-1.5 rounded text-xs border border-rose-500">清理选中</button>
@@ -1932,6 +1933,7 @@
         let klineHasRenderedData = false;
         let klinePreloadKey = null;
         let klinePreloadPayload = null;
+        let klineRealtimeMarkers = [];
         let klineLoadingShownAt = 0;
         let klineChart = null;
         let klineCandlesSeries = null;
@@ -2515,6 +2517,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                     break;
                 case 'backtest_trade':
                     renderBacktestTrade(data);
+                    upsertRealtimeBacktestTradeMarker(data);
                     break;
                 case 'ministry_tick':
                     updateMinistryTick(data);
@@ -7094,6 +7097,26 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             }
         }
 
+        async function repushLatestDailySummary() {
+            try {
+                updateWebhookRetryStatus('正在手动重复推送最近日终汇总...');
+                const res = await fetch('/api/webhook/daily_summary/repush', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const data = await res.json();
+                if (!res.ok || data.status !== 'success') throw new Error(data.msg || '重复推送失败');
+                const dayText = String(data.date || '--');
+                const stockCount = Number(data.stock_count || 0);
+                updateWebhookRetryStatus(`已完成手动重复推送：${dayText}（${stockCount}只标的）`);
+                logMessage('SYSTEM', `日终汇总已手动重复推送：${dayText}（${stockCount}只标的）`, 'success');
+            } catch (e) {
+                updateWebhookRetryStatus(`重复推送失败: ${e}`);
+                logMessage('SYSTEM', `手动重复推送日终汇总失败: ${e}`, 'danger');
+            }
+        }
+
         async function clearSelectedWebhookEvents() {
             const ids = Array.from(webhookFailedSelectedIds);
             if (!ids.length) {
@@ -8560,6 +8583,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             currentBacktestChartCtx = { stock: code, start: dates.start, end: dates.end };
             klineLastProgressDate = null;
             klineHasRenderedData = false;
+            klineRealtimeMarkers = [];
             const klineBtn = document.getElementById('kline-open-btn');
             if (klineBtn) klineBtn.classList.remove('hidden');
             if (klineModalOpened) {
@@ -8736,14 +8760,57 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (!candles.length) return;
             klineCandlesSeries.setData(candles);
             klineVolumeSeries.setData(volumes);
+            klineRealtimeMarkers = markers.slice();
             if (typeof klineCandlesSeries.setMarkers === 'function') {
-                klineCandlesSeries.setMarkers(markers);
+                klineCandlesSeries.setMarkers(klineRealtimeMarkers);
             } else if (typeof LightweightCharts?.createSeriesMarkers === 'function') {
-                LightweightCharts.createSeriesMarkers(klineCandlesSeries, markers);
+                LightweightCharts.createSeriesMarkers(klineCandlesSeries, klineRealtimeMarkers);
             }
             klineChart.timeScale().fitContent();
             renderKlineLegend(payload?.strategies || []);
             klineHasRenderedData = true;
+        }
+
+        function upsertRealtimeBacktestTradeMarker(data) {
+            if (!klineModalOpened || !currentBacktestChartCtx || !klineCandlesSeries) return;
+            const tradeCode = normalizeCode(String(data?.code || ''));
+            const ctxCode = normalizeCode(String(currentBacktestChartCtx.stock || ''));
+            if (!tradeCode || !ctxCode || tradeCode !== ctxCode) return;
+            const direction = String(data?.dir || '').toUpperCase();
+            if (direction !== 'BUY' && direction !== 'SELL') return;
+            const rawDt = String(data?.dt || '').trim();
+            const ts = Date.parse(rawDt.includes(' ') ? rawDt.replace(' ', 'T') : rawDt);
+            if (!Number.isFinite(ts)) return;
+            const dtObj = new Date(ts);
+            const dayText = `${dtObj.getFullYear()}-${String(dtObj.getMonth() + 1).padStart(2, '0')}-${String(dtObj.getDate()).padStart(2, '0')}`;
+            const startText = String(currentBacktestChartCtx.start || '');
+            const endText = String(currentBacktestChartCtx.end || '');
+            if (startText && dayText < startText) return;
+            if (endText && dayText > endText) return;
+            const sid = String(data?.strategy || '').trim();
+            const strategyList = Array.isArray(klinePreloadPayload?.strategies) ? klinePreloadPayload.strategies : [];
+            const matchedStrategy = strategyList.find(x => String(x?.id || '') === sid);
+            const marker = {
+                time: dayText,
+                strategy_id: sid,
+                position: direction === 'BUY' ? 'belowBar' : 'aboveBar',
+                shape: direction === 'BUY' ? 'arrowUp' : 'arrowDown',
+                color: String(matchedStrategy?.color || '#60a5fa'),
+                text: Number(data?.price || 0).toFixed(2)
+            };
+            const dup = klineRealtimeMarkers.some(m =>
+                String(m?.time || '') === marker.time &&
+                String(m?.strategy_id || '') === marker.strategy_id &&
+                String(m?.shape || '') === marker.shape &&
+                String(m?.text || '') === marker.text
+            );
+            if (dup) return;
+            klineRealtimeMarkers.push(marker);
+            if (typeof klineCandlesSeries.setMarkers === 'function') {
+                klineCandlesSeries.setMarkers(klineRealtimeMarkers);
+            } else if (typeof LightweightCharts?.createSeriesMarkers === 'function') {
+                LightweightCharts.createSeriesMarkers(klineCandlesSeries, klineRealtimeMarkers);
+            }
         }
 
         function refreshKlineModalImage(force = false, progressDate = null) {
