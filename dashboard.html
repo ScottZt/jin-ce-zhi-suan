@@ -459,6 +459,7 @@
                     <i class="fa-solid fa-chevron-down text-xs"></i>
                 </div>
                 <div id="strategy-multi-panel" class="hidden absolute top-full mt-2 left-0 z-50 w-[420px] bg-slate-900 border border-slate-700 rounded shadow-2xl p-3">
+                    <input id="strategy-multi-search" type="text" placeholder="搜索策略ID/名称" class="w-full mb-2 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 font-mono" />
                     <label class="flex items-center gap-2 text-xs text-white mb-2">
                         <input id="strategy-all-checkbox" type="checkbox" onchange="toggleAllStrategies(this.checked)" />
                         <span>全部策略</span>
@@ -1078,6 +1079,183 @@
                             <button onclick="openFeatureFromHub('config')" class="bg-purple-700 hover:bg-purple-600 text-white px-3 py-2 rounded text-xs border border-purple-500">配置中心</button>
                             <button onclick="openFeatureFromHub('webhook')" class="bg-amber-700 hover:bg-amber-600 text-white px-3 py-2 rounded text-xs border border-amber-500">推送补偿</button>
                             <button onclick="openFeatureFromHub('pattern')" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-xs border border-slate-500">经典形态</button>
+                            <button onclick="openFeatureFromHub('evolution')" class="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-2 rounded text-xs border border-cyan-500">策略进化</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="evolution-board-modal" class="hidden fixed inset-0 bg-black/70 z-[147] flex items-center justify-center p-6">
+        <div class="w-[980px] max-w-[96vw] h-[90vh] bg-slate-900 border border-slate-700 rounded-lg shadow-2xl flex flex-col overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                <div class="text-white font-bold"><i class="fa-solid fa-dna mr-2 text-cyan-300"></i>Evolution 策略进化看板</div>
+                <button onclick="closeEvolutionBoardModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="px-4 py-2 text-xs text-slate-400 border-b border-slate-700">策略进化运行看板（起点配置 / 过程日志 / 结果摘要）。</div>
+            <div id="ops-evolution-body" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <div class="bg-gradient-to-r from-cyan-900/40 to-slate-900 border border-cyan-800/60 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                    <div>
+                        <div class="text-sm font-bold text-white"><i class="fa-solid fa-dna mr-2 text-cyan-300"></i>Evolution 策略进化看板</div>
+                        <div id="evolution-status-pill" class="text-[11px] text-slate-300 font-mono mt-1">未启动</div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 min-w-[330px]">
+                        <button id="evolution-start-btn" onclick="startEvolutionRun()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded border border-emerald-500 w-full"><span id="evolution-start-btn-text">启动</span></button>
+                        <button id="evolution-stop-btn" onclick="stopEvolutionRun()" class="bg-rose-700 hover:bg-rose-600 text-white px-3 py-1.5 rounded border border-rose-500 w-full"><span id="evolution-stop-btn-text">停止</span></button>
+                        <button id="evolution-reset-btn" type="button" onclick="resetEvolutionBoardUi()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded border border-slate-500 w-full"><span id="evolution-reset-btn-text">重置</span></button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                    <div class="xl:col-span-5 space-y-3">
+                        <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3 space-y-3">
+                            <div class="text-slate-200 font-semibold text-sm">运行配置</div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <div class="text-slate-400 mb-1">间隔(s)</div>
+                                    <input id="evolution-interval" type="number" min="0" step="0.5" value="1" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono" />
+                                </div>
+                                <div>
+                                    <div class="text-slate-400 mb-1">最大轮数</div>
+                                    <input id="evolution-max-iterations" type="number" min="0" step="1" value="0" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono" />
+                                </div>
+                            </div>
+                            <div class="text-slate-300">起点与评估范围</div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <div class="text-slate-400 mb-1">起点来源</div>
+                                    <select id="evolution-seed-source" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono text-[11px]">
+                                        <option value="strategy_dropdown" selected>在此多选策略列表</option>
+                                        <option value="manual">手工输入ID</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div class="text-slate-400 mb-1">是否含内置策略</div>
+                                    <select id="evolution-seed-include-builtin" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono text-[11px]">
+                                        <option value="">默认</option>
+                                        <option value="true">是</option>
+                                        <option value="false">否</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div class="text-slate-400 mb-1">仅启用策略</div>
+                                    <select id="evolution-seed-only-enabled" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono text-[11px]">
+                                        <option value="">默认</option>
+                                        <option value="true">是</option>
+                                        <option value="false">否</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div class="text-slate-400 mb-1">是否入库</div>
+                                    <select id="evolution-persist-enabled" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono text-[11px]">
+                                        <option value="">默认</option>
+                                        <option value="true">是</option>
+                                        <option value="false">否</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div class="text-slate-400 mb-1">评估标的</div>
+                                    <input id="evolution-target-stock-codes" type="text" placeholder="例如 000001.SZ,600036.SH" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono text-[11px]" />
+                                </div>
+                                <div>
+                                    <div class="text-slate-400 mb-1">评估周期</div>
+                                    <input id="evolution-timeframes" type="text" placeholder="例如 1min,5min,15min" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono text-[11px]" />
+                                </div>
+                            </div>
+                            <div id="evolution-seed-select-wrap" class="space-y-1">
+                                <div class="text-slate-400">起点策略多选</div>
+                                <input id="evolution-seed-search" type="text" placeholder="搜索策略ID/名称" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] text-slate-100 font-mono" />
+                                <label class="flex items-center gap-2 text-[11px] text-slate-300">
+                                    <input id="evolution-seed-all-checkbox" type="checkbox" onchange="toggleAllEvolutionSeedStrategies(this.checked)" />
+                                    <span>全选</span>
+                                </label>
+                                <div id="evolution-seed-strategy-list" class="h-40 overflow-y-auto space-y-1 border border-slate-700 rounded p-1 bg-slate-900/60"></div>
+                            </div>
+                            <div id="evolution-seed-from-strategy-summary" class="text-[11px] text-cyan-300 font-mono break-words">起点策略（多选下拉）：--</div>
+                            <div id="evolution-seed-manual-wrap" class="grid grid-cols-2 gap-2 hidden">
+                                <div>
+                                    <div class="text-slate-400 mb-1">固定起点ID</div>
+                                    <input id="evolution-seed-strategy-id" type="text" placeholder="例如 09" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono text-[11px]" />
+                                </div>
+                                <div>
+                                    <div class="text-slate-400 mb-1">候选起点IDs</div>
+                                    <input id="evolution-seed-strategy-ids" type="text" placeholder="例如 09,34A,58" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono text-[11px]" />
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-slate-400 mb-1">入库阈值</div>
+                                <div class="flex items-center gap-2">
+                                    <input id="evolution-persist-score-threshold" type="number" min="-100" step="0.001" placeholder="例如 0.2" class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono text-[11px]" />
+                                    <button id="evolution-threshold-recommend-btn" type="button" onclick="applyEvolutionRecommendedThreshold()" class="px-2 py-1 rounded border border-cyan-600 text-cyan-300 hover:bg-cyan-600/20 text-[11px] whitespace-nowrap">推荐阈值(50轮)</button>
+                                </div>
+                                <div id="evolution-threshold-recommendation" class="mt-1 text-[11px] text-slate-400 font-mono break-words">分布推荐：--</div>
+                            </div>
+                            <div id="evolution-effective-profile" class="text-[11px] text-slate-400 font-mono break-words">有效配置：--</div>
+                        </div>
+                    </div>
+                    <div class="xl:col-span-7 space-y-3">
+                        <div id="evolution-status-text" class="text-[11px] text-slate-300 font-mono bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2">待命</div>
+                        <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3 space-y-2">
+                            <div class="flex items-center justify-between gap-2 text-[11px] font-mono">
+                                <div id="evolution-progress-label" class="text-cyan-300">阶段：待命</div>
+                                <div id="evolution-progress-text" class="text-slate-300">--%</div>
+                            </div>
+                            <div class="w-full h-2 bg-slate-900 border border-slate-700 rounded overflow-hidden">
+                                <div id="evolution-progress-bar" class="h-full bg-cyan-500 transition-all duration-300" style="width:0%"></div>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 text-[11px] font-mono">
+                                <div id="evolution-progress-detail" class="text-slate-400 break-words">进度详情：--</div>
+                                <div id="evolution-data-status" class="text-slate-300 whitespace-nowrap">数据状态：待命</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                            <div class="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2">
+                                <div class="text-slate-400">运行状态</div>
+                                <div id="evolution-running" class="text-emerald-300 font-mono">--</div>
+                            </div>
+                            <div class="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2">
+                                <div class="text-slate-400">当前轮次</div>
+                                <div id="evolution-iteration" class="text-cyan-300 font-mono">--</div>
+                            </div>
+                            <div class="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2">
+                                <div class="text-slate-400">最近状态</div>
+                                <div id="evolution-last-status" class="text-slate-100 font-mono">--</div>
+                            </div>
+                            <div class="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2">
+                                <div class="text-slate-400">最近评分</div>
+                                <div id="evolution-last-score" class="text-amber-300 font-mono">--</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2">
+                                <div class="text-slate-400">OK/Reject/Error</div>
+                                <div id="evolution-outcome-count" class="text-slate-100 font-mono">--/--/--</div>
+                            </div>
+                            <div class="bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2">
+                                <div class="text-slate-400">最佳评分</div>
+                                <div id="evolution-best-score" class="text-emerald-300 font-mono">--</div>
+                            </div>
+                            <div class="bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2">
+                                <div class="text-slate-400">平均耗时(ms)</div>
+                                <div id="evolution-avg-cost" class="text-cyan-300 font-mono">--</div>
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+                            <div class="text-slate-300 mb-2 font-semibold">进化结论摘要</div>
+                            <div id="evolution-conclusion-wrap" class="text-[11px] text-slate-200 font-mono whitespace-pre-wrap break-words">暂无</div>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                            <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+                                <div class="text-slate-300 mb-2 font-semibold">进化日志</div>
+                                <div id="evolution-log-wrap" class="h-40 overflow-auto pr-1 text-[11px] font-mono text-slate-200 space-y-1"></div>
+                            </div>
+                            <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+                                <div class="text-slate-300 mb-2 font-semibold">最近进化记录</div>
+                                <div id="evolution-history-wrap" class="h-40 overflow-auto pr-1 text-[11px] font-mono text-slate-200 space-y-1"></div>
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+                            <div class="text-slate-300 mb-2 font-semibold">Top策略(score)</div>
+                            <div id="evolution-top-wrap" class="h-32 overflow-auto pr-1 text-[11px] font-mono text-slate-200 space-y-1"></div>
                         </div>
                     </div>
                 </div>
@@ -1101,7 +1279,13 @@
                 <div class="text-white font-bold"><i class="fa-solid fa-sliders mr-2 text-purple-400"></i>运行配置中心</div>
                 <button onclick="closeConfigCenter()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="px-4 py-2 text-xs text-slate-400 border-b border-slate-700">按模块表单编辑配置，保存后自动生效</div>
+            <div class="px-4 py-2 text-xs text-slate-400 border-b border-slate-700 flex items-center justify-between gap-2">
+                <span>按模块表单编辑配置，保存后自动生效</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="setAllConfigSections(true)" class="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-[11px] border border-slate-600">全部展开</button>
+                    <button onclick="setAllConfigSections(false)" class="bg-slate-800 hover:bg-slate-700 text-white px-2 py-1 rounded text-[11px] border border-slate-600">全部折叠</button>
+                </div>
+            </div>
             <div class="flex-1 p-4 overflow-y-auto">
                 <div id="config-form-container" class="space-y-4"></div>
             </div>
@@ -1592,7 +1776,7 @@
                 <div id="strategy-delete-risk-body" class="text-xs text-slate-300 whitespace-pre-wrap bg-slate-950 border border-slate-700 rounded p-3"></div>
                 <label class="flex items-center gap-2 text-xs text-amber-300">
                     <input id="strategy-delete-force" type="checkbox" class="accent-amber-500">
-                    强制删除（仅用于确认为孤立策略时）
+                    已确认风险，强制删除（必选）
                 </label>
             </div>
             <div class="px-4 py-3 border-t border-slate-700 flex items-center justify-end gap-2">
@@ -1809,6 +1993,26 @@
         </div>
     </div>
 
+    <div id="evolution-top-detail-modal" class="hidden fixed inset-0 bg-black/80 z-[157] items-center justify-center p-4">
+        <div class="w-[980px] max-w-[98vw] h-[86vh] bg-slate-900 border border-cyan-700/60 rounded-lg shadow-2xl overflow-hidden flex flex-col">
+            <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                <div class="text-white font-semibold text-sm">Top策略详情</div>
+                <button onclick="closeEvolutionTopDetail()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="px-4 py-2 text-[11px] text-slate-300 border-b border-slate-700 font-mono" id="evolution-top-detail-meta">--</div>
+            <div class="grid grid-cols-2 gap-3 p-3 flex-1 min-h-0">
+                <div class="bg-slate-800/50 border border-slate-700 rounded p-2 overflow-auto">
+                    <div class="text-xs text-slate-300 mb-2">指标</div>
+                    <pre id="evolution-top-detail-metrics" class="text-[11px] text-slate-200 font-mono whitespace-pre-wrap break-words">--</pre>
+                </div>
+                <div class="bg-slate-950 border border-slate-700 rounded p-2 overflow-auto">
+                    <div class="text-xs text-slate-300 mb-2">策略代码</div>
+                    <pre id="evolution-top-detail-code" class="text-[11px] text-cyan-200 font-mono whitespace-pre-wrap break-words">--</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="debug-panel" class="hidden fixed right-4 bottom-20 w-[440px] max-w-[92vw] bg-slate-900/95 border border-slate-700 rounded-lg shadow-2xl z-[120] overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
             <div class="text-sm font-bold text-white"><i class="fa-solid fa-bug mr-2 text-amber-400"></i>调试面板</div>
@@ -1884,6 +2088,16 @@
         let batchComboRecommendPending = false;
         const DEFAULT_TASKS_CSV = 'data/batch_tasks/批量回测任务.csv';
         const DEFAULT_ARCHIVE_TASKS_CSV = 'data/batch_tasks/archive/批量回测任务.archive.csv';
+        let evolutionLastState = null;
+        let evolutionLastActivity = null;
+        let evolutionHistoryRows = [];
+        let evolutionTopRows = [];
+        let evolutionLogRows = [];
+        let evolutionLastRunning = null;
+        let evolutionStartPending = false;
+        let evolutionStopPending = false;
+        let evolutionStopConfirmUntil = 0;
+        let evolutionStopConfirmTimer = null;
         let liveRunning = false;
         let liveEnabled = window.__LIVE_ENABLED__ === true;
         let liveActionPending = false;
@@ -1892,6 +2106,9 @@
         let currentSource = 'default';
         let strategyCatalog = [];
         let selectedStrategyIds = [];
+        let strategyPanelTempSelectedIds = [];
+        let evolutionSeedTempSelectedIds = [];
+        let evolutionSeedAllowTopFallback = true;
         let latestStrategyScores = {};
         let backtestResultRecovered = false;
         let historySyncRunning = false;
@@ -2322,6 +2539,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 updateDebugPanel();
                 loadStrategyManager();
                 syncStatus();
+                refreshEvolutionDashboard({ withHistory: true, withTop: true });
                 wsHeartbeatTimer = setInterval(() => {
                     if (!ws || ws.readyState !== WebSocket.OPEN) return;
                     if (Date.now() - wsLastPongAt > WS_STALE_TIMEOUT_MS) {
@@ -2508,6 +2726,15 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 case 'fund_pool':
                     ingestFundPoolSnapshot(data, payload.stock_code, true);
                     break;
+                case 'evolution_state':
+                    applyEvolutionState(data || {});
+                    break;
+                case 'evolution_tick':
+                    applyEvolutionTick(data || {});
+                    break;
+                case 'evolution_progress':
+                    applyEvolutionProgress(data || {});
+                    break;
                 case 'backtest_progress':
                     updateBacktestProgress(data);
                     refreshKlineModalImage(false, data.current_date || null);
@@ -2589,6 +2816,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             renderStrategySelectionSummary();
             updateStrategyQuick(selectedStrategyIds.length === 1 ? String(selectedStrategyIds[0]) : 'all');
             _refreshBatchStrategyRangeSummary();
+            renderEvolutionSeedSourceUi();
         }
 
         function applyLiveStrategySelection(strategies) {
@@ -2666,6 +2894,99 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             return true;
         }
 
+        function strategyScoreColor(score) {
+            const s = Math.max(0, Math.min(100, Number(score || 0)));
+            const hue = 120 - (s / 100) * 120;
+            return `hsl(${hue}, 85%, 55%)`;
+        }
+
+        function getCheckedValuesByClass(className) {
+            const ids = [];
+            document.querySelectorAll(`.${className}`).forEach(cb => {
+                if (cb.checked) ids.push(String(cb.value));
+            });
+            return ids;
+        }
+
+        function setCheckedValuesByClass(className, values, fallbackAllChecked = false) {
+            const set = new Set((Array.isArray(values) ? values : []).map(x => String(x)));
+            document.querySelectorAll(`.${className}`).forEach(cb => {
+                cb.checked = set.size ? set.has(String(cb.value)) : !!fallbackAllChecked;
+            });
+        }
+
+        function renderSearchableStrategyChecklist(options) {
+            const cfg = options && typeof options === 'object' ? options : {};
+            const listEl = document.getElementById(cfg.listId);
+            if (!listEl) return;
+            const searchText = String(document.getElementById(cfg.searchInputId)?.value || '').trim().toLowerCase();
+            const rows = Array.isArray(cfg.rows) ? cfg.rows : [];
+            const selectedSet = new Set((Array.isArray(cfg.selectedIds) ? cfg.selectedIds : []).map(x => String(x)));
+            const filtered = !searchText
+                ? rows
+                : rows.filter(row => {
+                    const id = String(row?.id || '').toLowerCase();
+                    const name = String(row?.name || '').toLowerCase();
+                    return id.includes(searchText) || name.includes(searchText);
+                });
+            if (!filtered.length) {
+                listEl.innerHTML = '<div class="text-[11px] text-slate-500 px-1 py-1">无匹配策略</div>';
+                return;
+            }
+            listEl.innerHTML = '';
+            filtered.forEach(row => {
+                const sid = String(row?.id || '').trim();
+                if (!sid) return;
+                const label = document.createElement('label');
+                label.className = 'flex items-center justify-between gap-2 text-xs text-slate-200 py-1 px-1 rounded hover:bg-slate-800/70';
+                const checked = selectedSet.has(sid) ? 'checked' : '';
+                const rightText = typeof cfg.renderRightText === 'function' ? String(cfg.renderRightText(row) || '') : '';
+                label.innerHTML = `<span class="flex items-center gap-2 min-w-0"><input type="checkbox" class="${cfg.checkboxClass}" value="${sid}" ${checked} /> <span class="truncate">[${sid}] ${String(row?.name || sid)}</span></span><span class="font-mono shrink-0">${rightText}</span>`;
+                const cb = label.querySelector('input');
+                if (cb && typeof cfg.onToggle === 'function') {
+                    cb.addEventListener('change', () => cfg.onToggle(cb, row));
+                }
+                listEl.appendChild(label);
+            });
+        }
+
+        function updateStrategyMultiListUI() {
+            const picked = strategyPanelTempSelectedIds.length ? strategyPanelTempSelectedIds.slice() : selectedStrategyIds.slice();
+            renderSearchableStrategyChecklist({
+                listId: 'strategy-multi-list',
+                searchInputId: 'strategy-multi-search',
+                checkboxClass: 'strategy-item-checkbox',
+                rows: strategyCatalog,
+                selectedIds: picked,
+                renderRightText: (row) => {
+                    const sid = String(row?.id || '');
+                    const scoreRaw = latestStrategyScores[sid];
+                    if (scoreRaw === undefined) return '评分 --';
+                    return `评分 ${Number(scoreRaw).toFixed(1)}`;
+                },
+                onToggle: (cb) => {
+                    const sid = String(cb?.value || '').trim();
+                    const curr = new Set((Array.isArray(strategyPanelTempSelectedIds) ? strategyPanelTempSelectedIds : []).map(x => String(x)));
+                    if (sid) {
+                        if (cb.checked) curr.add(sid);
+                        else curr.delete(sid);
+                    }
+                    strategyPanelTempSelectedIds = Array.from(curr);
+                    const allBox = document.getElementById('strategy-all-checkbox');
+                    if (allBox) allBox.checked = strategyPanelTempSelectedIds.length === strategyCatalog.length && strategyCatalog.length > 0;
+                }
+            });
+            document.querySelectorAll('#strategy-multi-list .font-mono').forEach(el => {
+                const text = String(el.textContent || '');
+                const m = text.match(/评分\s+([0-9.]+)/);
+                if (!m) return;
+                const score = Number(m[1]);
+                if (!Number.isFinite(score)) return;
+                el.style.color = strategyScoreColor(score);
+                el.style.fontWeight = '700';
+            });
+        }
+
         function updateStrategyList(strategies, preserveSelection = false) {
             const prevSelected = Array.isArray(selectedStrategyIds) ? selectedStrategyIds.slice() : [];
             strategyCatalog = Array.isArray(strategies) ? strategies.slice() : [];
@@ -2687,56 +3008,33 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             } else {
                 selectedStrategyIds = [];
             }
-            const scoreColor = (score) => {
-                const s = Math.max(0, Math.min(100, Number(score || 0)));
-                const hue = 120 - (s / 100) * 120;
-                return `hsl(${hue}, 85%, 55%)`;
-            };
-            const list = document.getElementById('strategy-multi-list');
-            if (list) {
-                list.innerHTML = '';
-                strategyCatalog.forEach(s => {
-                    const sid = String(s.id);
-                    const scoreRaw = latestStrategyScores[sid];
-                    const scoreBadge = scoreRaw === undefined
-                        ? '<span class="text-[11px] text-slate-500">--</span>'
-                        : `<span class="text-[11px] font-bold" style="color:${scoreColor(scoreRaw)}">${Number(scoreRaw).toFixed(1)}</span>`;
-                    const row = document.createElement('label');
-                    row.className = 'flex items-center justify-between gap-2 text-xs text-slate-200 py-1';
-                    const checked = selectedStrategyIds.includes(String(s.id)) ? 'checked' : '';
-                    row.innerHTML = `<span class="flex items-center gap-2"><input type="checkbox" class="strategy-item-checkbox" value="${s.id}" ${checked} /> <span>[${s.id}] ${s.name}</span></span><span class="font-mono">评分 ${scoreBadge}</span>`;
-                    const cb = row.querySelector('input');
-                    if (cb) {
-                        cb.addEventListener('change', () => {
-                            const picked = getSelectedStrategiesFromUI();
-                            const allBox = document.getElementById('strategy-all-checkbox');
-                            if (allBox) allBox.checked = picked.length === strategyCatalog.length;
-                        });
-                    }
-                    list.appendChild(row);
-                });
-            }
+            strategyPanelTempSelectedIds = selectedStrategyIds.slice();
+            updateStrategyMultiListUI();
             syncStrategySelectionUI();
         }
 
         function toggleStrategyPanel() {
             const panel = document.getElementById('strategy-multi-panel');
             if (!panel) return;
+            if (panel.classList.contains('hidden')) {
+                strategyPanelTempSelectedIds = selectedStrategyIds.slice();
+                updateStrategyMultiListUI();
+            }
             panel.classList.toggle('hidden');
         }
 
         function toggleAllStrategies(checked) {
-            document.querySelectorAll('.strategy-item-checkbox').forEach(cb => {
-                cb.checked = !!checked;
-            });
+            if (checked) {
+                strategyPanelTempSelectedIds = strategyCatalog.map(s => String(s.id)).filter(Boolean);
+            } else {
+                strategyPanelTempSelectedIds = [];
+            }
+            setCheckedValuesByClass('strategy-item-checkbox', strategyPanelTempSelectedIds, !!checked);
         }
 
         function getSelectedStrategiesFromUI() {
-            const ids = [];
-            document.querySelectorAll('.strategy-item-checkbox').forEach(cb => {
-                if (cb.checked) ids.push(String(cb.value));
-            });
-            return ids;
+            if (Array.isArray(strategyPanelTempSelectedIds)) return strategyPanelTempSelectedIds.slice();
+            return getCheckedValuesByClass('strategy-item-checkbox');
         }
 
         function renderStrategySelectionSummary() {
@@ -2760,9 +3058,11 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         function applyStrategySelection() {
             const picked = getSelectedStrategiesFromUI();
             selectedStrategyIds = picked;
+            strategyPanelTempSelectedIds = picked.slice();
             const allBox = document.getElementById('strategy-all-checkbox');
             if (allBox) allBox.checked = picked.length === strategyCatalog.length;
             renderStrategySelectionSummary();
+            renderEvolutionSeedSourceUi();
             const panel = document.getElementById('strategy-multi-panel');
             if (panel) panel.classList.add('hidden');
             switchStrategy(picked);
@@ -4611,6 +4911,29 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 ]
             },
             {
+                title: '太常寺策略进化（LLM）',
+                subtitle: 'Evolution 生成策略专用大模型配置（建议密钥走私有配置）',
+                field_groups: [
+                    { key: 'basic', name: '基础', defaultOpen: true, paths: ['evolution.llm.enabled', 'evolution.llm.provider', 'evolution.llm.model'] },
+                    { key: 'network', name: '网络', defaultOpen: true, paths: ['evolution.llm.base_url', 'evolution.llm.timeout_seconds', 'evolution.llm.retry_times'] },
+                    { key: 'security', name: '安全', defaultOpen: false, paths: ['evolution.llm.api_key', 'evolution.llm.fallback_to_mock'] },
+                    { key: 'generation', name: '生成策略', defaultOpen: false, paths: ['evolution.llm.temperature', 'evolution.llm.max_tokens', 'evolution.llm.system_prompt'] }
+                ],
+                fields: [
+                    { path: 'evolution.llm.enabled', label: '启用真实LLM', type: 'boolean', desc: '关闭时使用内置Mock生成；开启后按以下配置调用真实模型' },
+                    { path: 'evolution.llm.provider', label: '服务类型', type: 'select', options: [{ value: 'openai_compatible', label: 'OpenAI兼容' }] },
+                    { path: 'evolution.llm.base_url', label: 'API地址', type: 'text', placeholder: '例如 https://xxx/v1 或 https://xxx/v1/chat/completions' },
+                    { path: 'evolution.llm.api_key', label: 'API密钥', type: 'password', secret: true, desc: '密钥字段会走 private_config_path 覆盖，不写入公开配置' },
+                    { path: 'evolution.llm.model', label: '模型名', type: 'text', placeholder: '例如 gpt-4o-mini / deepseek-chat' },
+                    { path: 'evolution.llm.temperature', label: '采样温度', type: 'number', min: 0, max: 2, step: 0.01, slider: true },
+                    { path: 'evolution.llm.max_tokens', label: '最大输出Token', type: 'number', min: 128, max: 8000, step: 1, slider: true },
+                    { path: 'evolution.llm.timeout_seconds', label: '请求超时(秒)', type: 'number', min: 5, max: 300, step: 1, slider: true },
+                    { path: 'evolution.llm.retry_times', label: '失败重试次数', type: 'number', min: 0, max: 5, step: 1, slider: true },
+                    { path: 'evolution.llm.fallback_to_mock', label: '失败回退Mock', type: 'boolean', desc: '开启后真实LLM失败会自动回退到Mock，保证进化流程不中断' },
+                    { path: 'evolution.llm.system_prompt', label: '系统提示词', type: 'text', placeholder: '用于约束策略生成风格与输出格式' }
+                ]
+            },
+            {
                 title: '工部增量同步',
                 subtitle: '历史增量同步写入模式',
                 fields: [
@@ -5081,16 +5404,73 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             return row;
         }
 
-        function renderSectionBlock(title, subtitle, fields, cfg) {
+        function toggleConfigGroupBody(bodyId) {
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            body.classList.toggle('hidden');
+        }
+
+        function toggleConfigSectionBody(bodyId) {
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            body.classList.toggle('hidden');
+        }
+
+        function setAllConfigSections(expanded) {
+            const open = !!expanded;
+            document.querySelectorAll('#config-form-container .config-section-body').forEach(el => {
+                if (open) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+        }
+
+        function renderConfigFieldGroups(host, sectionMeta, fields, cfg) {
+            const groups = Array.isArray(sectionMeta?.field_groups) ? sectionMeta.field_groups : [];
+            if (!groups.length) {
+                fields.forEach(f => host.appendChild(createBusinessField(f, cfg)));
+                return;
+            }
+            const map = {};
+            fields.forEach(f => { map[String(f.path || '')] = f; });
+            groups.forEach((g, idx) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'border border-slate-700 rounded p-2 space-y-2 bg-slate-950/40';
+                const bodyId = `cfg-group-${String(sectionMeta.title || 'section').replace(/[^\w\u4e00-\u9fa5]+/g, '-')}-${String(g.key || idx)}`;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'w-full text-left text-[11px] text-cyan-300 font-bold flex items-center justify-between';
+                btn.setAttribute('onclick', `toggleConfigGroupBody('${bodyId}')`);
+                btn.innerHTML = `<span>${String(g.name || g.key || `分组${idx + 1}`)}</span><span class="text-slate-400">折叠/展开</span>`;
+                wrapper.appendChild(btn);
+                const inner = document.createElement('div');
+                inner.id = bodyId;
+                inner.className = `space-y-2 ${g.defaultOpen === false ? 'hidden' : ''}`;
+                const groupPaths = Array.isArray(g.paths) ? g.paths.map(x => String(x || '')) : [];
+                groupPaths.forEach(p => {
+                    if (map[p]) inner.appendChild(createBusinessField(map[p], cfg));
+                });
+                wrapper.appendChild(inner);
+                host.appendChild(wrapper);
+            });
+            const allGrouped = new Set();
+            groups.forEach(g => (Array.isArray(g.paths) ? g.paths : []).forEach(p => allGrouped.add(String(p || ''))));
+            fields.forEach(f => {
+                if (!allGrouped.has(String(f.path || ''))) host.appendChild(createBusinessField(f, cfg));
+            });
+        }
+
+        function renderSectionBlock(title, subtitle, fields, cfg, sectionMeta = null) {
             const block = document.createElement('div');
             block.className = 'border border-slate-700 rounded-lg overflow-hidden';
+            const sectionBodyId = `cfg-section-body-${String(title || 'section').replace(/[^\w\u4e00-\u9fa5]+/g, '-')}`;
             const head = document.createElement('div');
-            head.className = 'px-3 py-2 bg-slate-800';
-            head.innerHTML = `<div class="text-xs font-bold text-purple-300 uppercase tracking-widest">${title}</div><div class="text-[10px] text-slate-400 mt-0.5">${subtitle || ''}</div>`;
+            head.className = 'px-3 py-2 bg-slate-800 flex items-center justify-between gap-2';
+            head.innerHTML = `<div><div class="text-xs font-bold text-purple-300 uppercase tracking-widest">${title}</div><div class="text-[10px] text-slate-400 mt-0.5">${subtitle || ''}</div></div><button type="button" onclick="toggleConfigSectionBody('${sectionBodyId}')" class="text-[11px] text-slate-300 hover:text-white border border-slate-600 rounded px-2 py-1">折叠/展开</button>`;
             block.appendChild(head);
             const body = document.createElement('div');
-            body.className = 'p-3 space-y-2';
-            fields.forEach(f => body.appendChild(createBusinessField(f, cfg)));
+            body.id = sectionBodyId;
+            body.className = 'p-3 space-y-2 config-section-body';
+            renderConfigFieldGroups(body, sectionMeta, fields, cfg);
             if (String(title || '') === '工部数据源') {
                 const ops = document.createElement('div');
                 ops.className = 'mt-2 border border-cyan-800/60 rounded p-3 bg-slate-950/50 space-y-2';
@@ -5125,12 +5505,14 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         function renderStrategyParamsSection(cfg) {
             const block = document.createElement('div');
             block.className = 'border border-slate-700 rounded-lg overflow-hidden';
+            const sectionBodyId = 'cfg-section-body-strategy-params';
             const head = document.createElement('div');
-            head.className = 'px-3 py-2 bg-slate-800';
-            head.innerHTML = `<div class="text-xs font-bold text-purple-300 uppercase tracking-widest">中书省策略研究中心</div><div class="text-[10px] text-slate-400 mt-0.5">分策略参数面板</div>`;
+            head.className = 'px-3 py-2 bg-slate-800 flex items-center justify-between gap-2';
+            head.innerHTML = `<div><div class="text-xs font-bold text-purple-300 uppercase tracking-widest">中书省策略研究中心</div><div class="text-[10px] text-slate-400 mt-0.5">分策略参数面板</div></div><button type="button" onclick="toggleConfigSectionBody('${sectionBodyId}')" class="text-[11px] text-slate-300 hover:text-white border border-slate-600 rounded px-2 py-1">折叠/展开</button>`;
             block.appendChild(head);
             const body = document.createElement('div');
-            body.className = 'p-3 space-y-3';
+            body.id = sectionBodyId;
+            body.className = 'p-3 space-y-3 config-section-body';
             STRATEGY_FORM_GROUPS.forEach(group => {
                 const g = document.createElement('div');
                 g.className = 'border border-slate-700 rounded p-2 space-y-2';
@@ -5150,7 +5532,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (!container) return;
             container.innerHTML = '';
             BIZ_SECTIONS.forEach(section => {
-                container.appendChild(renderSectionBlock(section.title, section.subtitle, section.fields, cfg));
+                container.appendChild(renderSectionBlock(section.title, section.subtitle, section.fields, cfg, section));
             });
             container.appendChild(renderStrategyParamsSection(cfg));
         }
@@ -5240,6 +5622,29 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             syncOpsHubBackdrop();
         }
 
+        function openEvolutionBoardModal() {
+            closeAllMajorFunctionModals('evolution-board-modal');
+            closeOpsHubModal();
+            evolutionSeedAllowTopFallback = true;
+            const modal = document.getElementById('evolution-board-modal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+            renderEvolutionSeedSourceUi();
+            refreshEvolutionDashboard({ withHistory: true, withTop: true });
+            setEvolutionStatusText('已打开策略进化看板', 'success');
+            const startBtn = document.getElementById('evolution-start-btn');
+            if (startBtn && typeof startBtn.focus === 'function') startBtn.focus();
+        }
+
+        function closeEvolutionBoardModal() {
+            const modal = document.getElementById('evolution-board-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
         function toggleOpsHubSection(bodyId) {
             const el = document.getElementById(bodyId);
             if (!el) return;
@@ -5308,7 +5713,8 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 'batch-task-csv-picker-modal',
                 'config-modal',
                 'webhook-retry-modal',
-                'pattern-picker-modal'
+                'pattern-picker-modal',
+                'evolution-board-modal'
             ];
             ids.forEach(id => {
                 if (id === keep) return;
@@ -5348,6 +5754,11 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             if (t === 'pattern') {
                 closeAllMajorFunctionModals('pattern-picker-modal');
                 openPatternPicker();
+                return;
+            }
+            if (t === 'evolution') {
+                openEvolutionBoardModal();
+                return;
             }
         }
 
@@ -7482,6 +7893,10 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             const sid = String(strategyDeletePendingId || '').trim();
             if (!sid) return;
             const force = !!document.getElementById('strategy-delete-force')?.checked;
+            if (!force) {
+                logMessage('SYSTEM', '请先勾选“已确认风险，强制删除（必选）”后再删除策略', 'warning');
+                return;
+            }
             try {
                 const res = await fetch('/api/strategy_manager/delete', {
                     method: 'POST',
@@ -9506,6 +9921,893 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
         };
         
+        function evolutionEscapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function evolutionParseListInput(value) {
+            return String(value || '')
+                .split(',')
+                .map(x => String(x || '').trim())
+                .filter(Boolean);
+        }
+
+        function evolutionParseOptionalBoolean(id) {
+            const raw = String(document.getElementById(id)?.value || '').trim().toLowerCase();
+            if (raw === 'true') return true;
+            if (raw === 'false') return false;
+            return null;
+        }
+
+        function evolutionFormatNumber(value, digits = 4) {
+            const num = Number(value);
+            if (!Number.isFinite(num)) return '--';
+            return num.toFixed(digits);
+        }
+
+        function collectRecentNumericValues(rows, valuePicker, limit = 50) {
+            const arr = Array.isArray(rows) ? rows.slice(-Math.max(1, Number(limit) || 50)) : [];
+            const result = [];
+            arr.forEach(item => {
+                const val = Number(typeof valuePicker === 'function' ? valuePicker(item) : item);
+                if (Number.isFinite(val)) result.push(val);
+            });
+            return result;
+        }
+
+        function calcQuantile(sortedValues, q) {
+            const sorted = Array.isArray(sortedValues) ? sortedValues : [];
+            if (!sorted.length) return NaN;
+            const ratio = Math.max(0, Math.min(1, Number(q) || 0));
+            if (sorted.length === 1) return Number(sorted[0]);
+            const pos = (sorted.length - 1) * ratio;
+            const lower = Math.floor(pos);
+            const upper = Math.ceil(pos);
+            const lv = Number(sorted[lower]);
+            const uv = Number(sorted[upper]);
+            if (!Number.isFinite(lv) || !Number.isFinite(uv)) return NaN;
+            if (lower === upper) return lv;
+            const weight = pos - lower;
+            return lv + (uv - lv) * weight;
+        }
+
+        function recommendThresholdByDistribution(values, options = {}) {
+            const nums = (Array.isArray(values) ? values : []).filter(v => Number.isFinite(Number(v))).map(v => Number(v));
+            const minSamples = Math.max(3, Number(options.minSamples || 8));
+            if (nums.length < minSamples) {
+                return {
+                    ok: false,
+                    samples: nums.length,
+                    message: `样本不足（${nums.length}/${minSamples}）`
+                };
+            }
+            const sorted = nums.slice().sort((a, b) => a - b);
+            const p50 = calcQuantile(sorted, 0.5);
+            const p70 = calcQuantile(sorted, 0.7);
+            const p85 = calcQuantile(sorted, 0.85);
+            const recommended = p70;
+            return {
+                ok: Number.isFinite(recommended),
+                samples: nums.length,
+                p50,
+                p70,
+                p85,
+                recommended
+            };
+        }
+
+        function renderEvolutionThresholdRecommendation() {
+            const hint = document.getElementById('evolution-threshold-recommendation');
+            const btn = document.getElementById('evolution-threshold-recommend-btn');
+            if (!hint) return;
+            const sampleScores = collectRecentNumericValues(evolutionHistoryRows, row => row?.score, 50);
+            const result = recommendThresholdByDistribution(sampleScores, { minSamples: 8 });
+            if (!result.ok) {
+                hint.innerText = `分布推荐：${result.message}，继续积累最近50轮评分后可推荐`;
+                if (btn) btn.title = `当前不可推荐：${result.message}`;
+                return;
+            }
+            const p50Text = result.p50.toFixed(3);
+            const p70Text = result.p70.toFixed(3);
+            const p85Text = result.p85.toFixed(3);
+            const recText = result.recommended.toFixed(3);
+            hint.innerText = `分布推荐：样本=${result.samples}，P50=${p50Text}，P70=${p70Text}，P85=${p85Text}，建议阈值=${recText}`;
+            if (btn) btn.title = `点击应用建议阈值 ${recText}`;
+        }
+
+        function applyEvolutionRecommendedThreshold() {
+            const input = document.getElementById('evolution-persist-score-threshold');
+            if (!input) return;
+            const sampleScores = collectRecentNumericValues(evolutionHistoryRows, row => row?.score, 50);
+            const result = recommendThresholdByDistribution(sampleScores, { minSamples: 8 });
+            if (!result.ok) {
+                appendEvolutionLog(`阈值推荐失败：${result.message}`, 'warning');
+                setEvolutionStatusText(`阈值推荐失败：${result.message}`, 'warning');
+                renderEvolutionThresholdRecommendation();
+                return;
+            }
+            input.value = result.recommended.toFixed(3);
+            renderEvolutionThresholdRecommendation();
+            appendEvolutionLog(`已应用推荐入库阈值=${result.recommended.toFixed(3)}（最近${result.samples}轮分布）`, 'info');
+            setEvolutionStatusText(`已应用推荐入库阈值=${result.recommended.toFixed(3)}（最近${result.samples}轮分布）`, 'success');
+        }
+
+        function triggerEvolutionButtonFx(buttonId, level = 'slate') {
+            const btn = document.getElementById(buttonId);
+            if (!btn) return;
+            btn.classList.remove('scale-95', 'ring-2', 'ring-emerald-300', 'ring-rose-300', 'ring-amber-300', 'ring-slate-300');
+            void btn.offsetWidth;
+            btn.classList.add('scale-95', 'ring-2');
+            const ringClass = level === 'emerald'
+                ? 'ring-emerald-300'
+                : (level === 'rose' ? 'ring-rose-300' : (level === 'amber' ? 'ring-amber-300' : 'ring-slate-300'));
+            btn.classList.add(ringClass);
+            setTimeout(() => {
+                btn.classList.remove('scale-95', 'ring-2', 'ring-emerald-300', 'ring-rose-300', 'ring-amber-300', 'ring-slate-300');
+            }, 220);
+        }
+
+        function resetEvolutionStopConfirmState(syncUi = true) {
+            evolutionStopConfirmUntil = 0;
+            if (evolutionStopConfirmTimer) {
+                clearTimeout(evolutionStopConfirmTimer);
+                evolutionStopConfirmTimer = null;
+            }
+            if (syncUi) updateEvolutionActionButtons();
+        }
+
+        function armEvolutionStopConfirmState() {
+            evolutionStopConfirmUntil = Date.now() + 5000;
+            if (evolutionStopConfirmTimer) clearTimeout(evolutionStopConfirmTimer);
+            evolutionStopConfirmTimer = setTimeout(() => {
+                if (Date.now() >= evolutionStopConfirmUntil) resetEvolutionStopConfirmState();
+            }, 5100);
+            updateEvolutionActionButtons();
+        }
+
+        function updateEvolutionActionButtons(runningOverride = null) {
+            const running = runningOverride === null ? !!(evolutionLastState && evolutionLastState.running) : !!runningOverride;
+            const startBtn = document.getElementById('evolution-start-btn');
+            const stopBtn = document.getElementById('evolution-stop-btn');
+            const resetBtn = document.getElementById('evolution-reset-btn');
+            const startText = document.getElementById('evolution-start-btn-text');
+            const stopText = document.getElementById('evolution-stop-btn-text');
+            const resetText = document.getElementById('evolution-reset-btn-text');
+            if (!running && evolutionStopConfirmUntil > 0) resetEvolutionStopConfirmState(false);
+            const confirmingStop = running && evolutionStopConfirmUntil > Date.now() && !evolutionStopPending;
+            const startDisabled = running || evolutionStartPending || evolutionStopPending;
+            const stopDisabled = !running || evolutionStartPending || evolutionStopPending;
+            const resetDisabled = running || evolutionStartPending || evolutionStopPending;
+            if (startBtn) {
+                startBtn.disabled = startDisabled;
+                startBtn.classList.toggle('opacity-70', startDisabled);
+                startBtn.classList.toggle('cursor-not-allowed', startDisabled);
+                startBtn.classList.toggle('animate-pulse', evolutionStartPending);
+            }
+            if (stopBtn) {
+                stopBtn.disabled = stopDisabled;
+                stopBtn.classList.toggle('opacity-70', stopDisabled);
+                stopBtn.classList.toggle('cursor-not-allowed', stopDisabled);
+                stopBtn.classList.toggle('animate-pulse', evolutionStopPending);
+                stopBtn.classList.toggle('bg-amber-700', confirmingStop);
+                stopBtn.classList.toggle('hover:bg-amber-600', confirmingStop);
+                stopBtn.classList.toggle('border-amber-500', confirmingStop);
+                stopBtn.classList.toggle('bg-rose-700', !confirmingStop);
+                stopBtn.classList.toggle('hover:bg-rose-600', !confirmingStop);
+                stopBtn.classList.toggle('border-rose-500', !confirmingStop);
+            }
+            if (resetBtn) {
+                resetBtn.disabled = resetDisabled;
+                resetBtn.classList.toggle('opacity-70', resetDisabled);
+                resetBtn.classList.toggle('cursor-not-allowed', resetDisabled);
+            }
+            if (startText) startText.innerText = evolutionStartPending ? '启动中...' : '启动';
+            if (stopText) {
+                if (evolutionStopPending) stopText.innerText = '停止中...';
+                else if (confirmingStop) stopText.innerText = '再次点击确认';
+                else stopText.innerText = '停止';
+            }
+            if (resetText) resetText.innerText = '重置';
+        }
+
+        function resetEvolutionBoardUi() {
+            const running = !!(evolutionLastState && evolutionLastState.running);
+            if (running || evolutionStartPending || evolutionStopPending) {
+                triggerEvolutionButtonFx('evolution-reset-btn', 'amber');
+                setEvolutionStatusText('运行中或操作处理中，不允许重置看板', 'warning');
+                appendEvolutionLog('重置被拦截：运行中或操作处理中', 'warning');
+                return;
+            }
+            triggerEvolutionButtonFx('evolution-reset-btn', 'slate');
+            evolutionLastState = null;
+            evolutionLastActivity = null;
+            evolutionHistoryRows = [];
+            evolutionTopRows = [];
+            evolutionLogRows = [];
+            evolutionLastRunning = null;
+            evolutionSeedTempSelectedIds = [];
+            evolutionSeedAllowTopFallback = false;
+            evolutionStartPending = false;
+            evolutionStopPending = false;
+            resetEvolutionStopConfirmState(false);
+            const defaults = {
+                'evolution-interval': '1',
+                'evolution-max-iterations': '0',
+                'evolution-seed-source': 'strategy_dropdown',
+                'evolution-seed-include-builtin': '',
+                'evolution-seed-only-enabled': '',
+                'evolution-persist-enabled': '',
+                'evolution-target-stock-codes': '',
+                'evolution-timeframes': '',
+                'evolution-seed-search': '',
+                'evolution-seed-strategy-id': '',
+                'evolution-seed-strategy-ids': '',
+                'evolution-persist-score-threshold': ''
+            };
+            Object.entries(defaults).forEach(([id, value]) => {
+                const el = document.getElementById(id);
+                if (el) el.value = value;
+            });
+            const statusPill = document.getElementById('evolution-status-pill');
+            const runningEl = document.getElementById('evolution-running');
+            const iterationEl = document.getElementById('evolution-iteration');
+            const lastStatusEl = document.getElementById('evolution-last-status');
+            const lastScoreEl = document.getElementById('evolution-last-score');
+            const outcomeEl = document.getElementById('evolution-outcome-count');
+            const bestEl = document.getElementById('evolution-best-score');
+            const avgCostEl = document.getElementById('evolution-avg-cost');
+            const conclusionEl = document.getElementById('evolution-conclusion-wrap');
+            const historyEl = document.getElementById('evolution-history-wrap');
+            const topEl = document.getElementById('evolution-top-wrap');
+            const logEl = document.getElementById('evolution-log-wrap');
+            const progressLabelEl = document.getElementById('evolution-progress-label');
+            const progressTextEl = document.getElementById('evolution-progress-text');
+            const progressBarEl = document.getElementById('evolution-progress-bar');
+            const progressDetailEl = document.getElementById('evolution-progress-detail');
+            const dataStatusEl = document.getElementById('evolution-data-status');
+            const startBtn = document.getElementById('evolution-start-btn');
+            const stopBtn = document.getElementById('evolution-stop-btn');
+            const allBox = document.getElementById('evolution-seed-all-checkbox');
+            if (statusPill) {
+                statusPill.innerText = '未启动';
+                statusPill.className = 'text-[11px] text-slate-300 font-mono mt-1';
+            }
+            if (runningEl) runningEl.innerText = '--';
+            if (iterationEl) iterationEl.innerText = '--';
+            if (lastStatusEl) lastStatusEl.innerText = '--';
+            if (lastScoreEl) lastScoreEl.innerText = '--';
+            if (outcomeEl) outcomeEl.innerText = '--/--/--';
+            if (bestEl) bestEl.innerText = '--';
+            if (avgCostEl) avgCostEl.innerText = '--';
+            if (conclusionEl) conclusionEl.innerText = '暂无';
+            if (historyEl) historyEl.innerHTML = '<div class="text-slate-500">暂无</div>';
+            if (topEl) topEl.innerHTML = '<div class="text-slate-500">暂无</div>';
+            if (logEl) logEl.innerHTML = '<div class="text-slate-500">暂无</div>';
+            if (progressLabelEl) progressLabelEl.innerText = '阶段：待命';
+            if (progressTextEl) progressTextEl.innerText = '--%';
+            if (progressBarEl) progressBarEl.style.width = '0%';
+            if (progressDetailEl) progressDetailEl.innerText = '进度详情：--';
+            if (dataStatusEl) {
+                dataStatusEl.innerText = '数据状态：待命';
+                dataStatusEl.className = 'text-slate-300 whitespace-nowrap';
+            }
+            if (allBox) allBox.checked = false;
+            renderEvolutionEffectiveProfile({});
+            renderEvolutionSeedSourceUi();
+            renderEvolutionThresholdRecommendation();
+            updateEvolutionActionButtons(false);
+            setEvolutionStatusText('已重置当前看板界面数据（仅前端显示）', 'warning');
+            logMessage('策略中心', '策略进化看板已重置（仅前端显示）', 'warning');
+        }
+
+        function getEvolutionSeedIdsFromStrategyDropdown() {
+            if (Array.isArray(evolutionSeedTempSelectedIds) && evolutionSeedTempSelectedIds.length) {
+                return evolutionSeedTempSelectedIds.slice();
+            }
+            const picked = Array.isArray(selectedStrategyIds) ? selectedStrategyIds.map(x => String(x || '').trim()).filter(Boolean) : [];
+            return picked;
+        }
+
+        function renderEvolutionSeedStrategySelectOptions() {
+            const list = document.getElementById('evolution-seed-strategy-list');
+            if (!list) return;
+            const prevSelected = new Set(Array.isArray(evolutionSeedTempSelectedIds) ? evolutionSeedTempSelectedIds.map(x => String(x || '').trim()) : []);
+            const topSelected = Array.isArray(selectedStrategyIds) ? selectedStrategyIds.map(x => String(x || '').trim()).filter(Boolean) : [];
+            const defaultSet = prevSelected.size ? prevSelected : (evolutionSeedAllowTopFallback ? new Set(topSelected) : new Set());
+            const rows = Array.isArray(strategyCatalog) ? strategyCatalog.filter(x => String(x?.id || '').trim()) : [];
+            evolutionSeedTempSelectedIds = rows.filter(row => {
+                const id = String(row?.id || '').trim();
+                if (!id) return false;
+                return defaultSet.size > 0 && defaultSet.has(id);
+            }).map(row => String(row.id));
+            renderSearchableStrategyChecklist({
+                listId: 'evolution-seed-strategy-list',
+                searchInputId: 'evolution-seed-search',
+                checkboxClass: 'evolution-seed-item-checkbox',
+                rows,
+                selectedIds: evolutionSeedTempSelectedIds,
+                renderRightText: () => '',
+                onToggle: (cb) => {
+                    const sid = String(cb?.value || '').trim();
+                    const curr = new Set((Array.isArray(evolutionSeedTempSelectedIds) ? evolutionSeedTempSelectedIds : []).map(x => String(x)));
+                    if (sid) {
+                        if (cb.checked) curr.add(sid);
+                        else curr.delete(sid);
+                    }
+                    evolutionSeedTempSelectedIds = Array.from(curr);
+                    const allBox = document.getElementById('evolution-seed-all-checkbox');
+                    if (allBox) allBox.checked = rows.length > 0 && evolutionSeedTempSelectedIds.length === rows.length;
+                    renderEvolutionSeedSourceUi();
+                }
+            });
+            const allBox = document.getElementById('evolution-seed-all-checkbox');
+            if (allBox) allBox.checked = rows.length > 0 && evolutionSeedTempSelectedIds.length === rows.length;
+        }
+
+        function toggleAllEvolutionSeedStrategies(checked) {
+            evolutionSeedTempSelectedIds = checked ? strategyCatalog.map(x => String(x?.id || '').trim()).filter(Boolean) : [];
+            setCheckedValuesByClass('evolution-seed-item-checkbox', evolutionSeedTempSelectedIds, !!checked);
+            renderEvolutionSeedSourceUi();
+        }
+
+        function renderEvolutionSeedSourceUi() {
+            const source = String(document.getElementById('evolution-seed-source')?.value || 'strategy_dropdown');
+            const manualWrap = document.getElementById('evolution-seed-manual-wrap');
+            const selectWrap = document.getElementById('evolution-seed-select-wrap');
+            const summary = document.getElementById('evolution-seed-from-strategy-summary');
+            if (manualWrap) manualWrap.classList.toggle('hidden', source !== 'manual');
+            if (selectWrap) selectWrap.classList.toggle('hidden', source === 'manual');
+            renderEvolutionSeedStrategySelectOptions();
+            if (!summary) return;
+            const ids = getEvolutionSeedIdsFromStrategyDropdown();
+            if (!ids.length) {
+                summary.innerText = '起点策略（多选下拉）：暂无，默认将按配置中心规则选种';
+                return;
+            }
+            const names = ids.slice(0, 6).map(id => {
+                const meta = (Array.isArray(strategyCatalog) ? strategyCatalog : []).find(x => String(x?.id || '') === String(id));
+                return `[${id}]${meta?.name ? meta.name : ''}`;
+            });
+            const suffix = ids.length > 6 ? ` ...共${ids.length}个` : ` 共${ids.length}个`;
+            summary.innerText = `起点策略（多选下拉）：${names.join('、')}${suffix}`;
+        }
+
+        function renderEvolutionEffectiveProfile(profile) {
+            const el = document.getElementById('evolution-effective-profile');
+            if (!el) return;
+            const p = profile && typeof profile === 'object' ? profile : {};
+            const seedOne = String(p.seed_strategy_id || '').trim() || '-';
+            const seedMany = Array.isArray(p.seed_strategy_ids) && p.seed_strategy_ids.length ? p.seed_strategy_ids.join(',') : '-';
+            const targets = Array.isArray(p.target_stock_codes) && p.target_stock_codes.length ? p.target_stock_codes.join(',') : '-';
+            const tfs = Array.isArray(p.timeframes) && p.timeframes.length ? p.timeframes.join(',') : '-';
+            const persistEnabled = p.persist_enabled === true ? '开' : (p.persist_enabled === false ? '关' : '-');
+            const threshold = Number.isFinite(Number(p.persist_score_threshold)) ? Number(p.persist_score_threshold).toFixed(3) : '--';
+            el.innerText = `有效配置：seed=${seedOne} | seed_pool=${seedMany} | include_builtin=${String(p.seed_include_builtin)} | only_enabled=${String(p.seed_only_enabled)} | stocks=${targets} | tfs=${tfs} | persist=${persistEnabled}@${threshold}`;
+        }
+
+        function renderEvolutionSummary(rows) {
+            const arr = Array.isArray(rows) ? rows : [];
+            const running = !!(evolutionLastState && evolutionLastState.running);
+            let ok = 0;
+            let rejected = 0;
+            let error = 0;
+            let best = null;
+            let costTotal = 0;
+            let costCount = 0;
+            arr.forEach(r => {
+                const status = String(r?.status || '').toLowerCase();
+                if (status === 'ok') ok += 1;
+                else if (status === 'error') error += 1;
+                else rejected += 1;
+                const score = Number(r?.score);
+                if (Number.isFinite(score)) best = best === null ? score : Math.max(best, score);
+                const cost = Number(r?.cost_ms);
+                if (Number.isFinite(cost) && cost >= 0) {
+                    costTotal += cost;
+                    costCount += 1;
+                }
+            });
+            const outcomeEl = document.getElementById('evolution-outcome-count');
+            const bestEl = document.getElementById('evolution-best-score');
+            const costEl = document.getElementById('evolution-avg-cost');
+            if (outcomeEl) outcomeEl.innerText = `${ok}/${rejected}/${error}`;
+            if (bestEl) bestEl.innerText = best === null ? (running ? '统计中' : '--') : best.toFixed(6);
+            if (costEl) costEl.innerText = costCount > 0 ? String(Math.round(costTotal / costCount)) : (running ? '统计中' : '--');
+        }
+
+        function renderEvolutionConclusion() {
+            const wrap = document.getElementById('evolution-conclusion-wrap');
+            if (!wrap) return;
+            const state = evolutionLastState && typeof evolutionLastState === 'object' ? evolutionLastState : {};
+            const statusText = evolutionDisplayStatus(state);
+            const hist = Array.isArray(evolutionHistoryRows) ? evolutionHistoryRows : [];
+            const top = Array.isArray(evolutionTopRows) ? evolutionTopRows : [];
+            if (!hist.length && !top.length) {
+                const running = !!state.running;
+                const iter = Number(state.iteration || 0);
+                const activity = state.activity && typeof state.activity === 'object' ? state.activity : {};
+                const phase = String(activity.phase_label || activity.phase || '待命');
+                const detail = String(activity.message || '').trim() || '等待首轮回测完成';
+                if (running) {
+                    wrap.innerText = [
+                        `运行状态: 运行中  轮次: ${iter > 0 ? iter : 1}  最近状态: ${statusText || 'running'}`,
+                        `结果分布: 首轮尚未完成，统计生成中`,
+                        `最佳策略: 统计中（将于首轮完成后展示）`,
+                        `当前阶段: ${phase} · ${detail}`,
+                    ].join('\n');
+                } else {
+                    wrap.innerText = '暂无';
+                }
+                return;
+            }
+            const latest = hist.length ? hist[hist.length - 1] : {};
+            const committedCount = hist.filter(r => !!r?.committed).length;
+            const okCount = hist.filter(r => String(r?.status || '').toLowerCase() === 'ok').length;
+            const errCount = hist.filter(r => String(r?.status || '').toLowerCase() === 'error').length;
+            const rejectCount = Math.max(0, hist.length - okCount - errCount);
+            const topOne = top.length ? top[0] : null;
+            const topScore = Number(topOne?.score);
+            const topScoreText = Number.isFinite(topScore) ? topScore.toFixed(6) : '--';
+            const topSharpe = evolutionFormatNumber(topOne?.metrics?.sharpe, 3);
+            const topWin = evolutionFormatNumber(topOne?.metrics?.win_rate, 3);
+            const latestReason = String(latest?.reason || latest?.error || '').trim() || '--';
+            const latestParent = String(latest?.parent_strategy_id || latest?.parent_strategy_name || '--');
+            const latestTf = String(latest?.best_timeframe || '--');
+            const latestStock = String(latest?.best_stock_code || '--');
+            wrap.innerText = [
+                `运行状态: ${state.running ? '运行中' : '已停止'}  轮次: ${state.iteration ?? '--'}  最近状态: ${statusText || '--'}`,
+                `结果分布: ok=${okCount}, rejected=${rejectCount}, error=${errCount}, committed=${committedCount}`,
+                `最佳策略: score=${topScoreText}, sharpe=${topSharpe}, win_rate=${topWin}`,
+                `最近一轮: parent=${latestParent}, tf=${latestTf}, stock=${latestStock}, reason=${latestReason}`,
+            ].join('\n');
+        }
+
+        function renderEvolutionLogs() {
+            const wrap = document.getElementById('evolution-log-wrap');
+            if (!wrap) return;
+            const arr = Array.isArray(evolutionLogRows) ? evolutionLogRows.slice(-120) : [];
+            if (!arr.length) {
+                wrap.innerHTML = '<div class="text-slate-500">暂无</div>';
+                return;
+            }
+            wrap.innerHTML = arr.slice().reverse().map(item => {
+                const level = String(item?.level || 'info');
+                const color = level === 'danger' ? 'text-rose-300' : (level === 'success' ? 'text-emerald-300' : (level === 'warning' ? 'text-amber-300' : 'text-slate-200'));
+                return `<div class="${color}">[${evolutionEscapeHtml(item?.time || '--')}] ${evolutionEscapeHtml(item?.message || '--')}</div>`;
+            }).join('');
+        }
+
+        function appendEvolutionLog(message, level = 'info') {
+            const msg = String(message || '').trim();
+            if (!msg) return;
+            const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
+            const prev = evolutionLogRows.length ? evolutionLogRows[evolutionLogRows.length - 1] : null;
+            if (prev && prev.message === msg && prev.level === level) return;
+            evolutionLogRows.push({ time: ts, level, message: msg });
+            if (evolutionLogRows.length > 200) evolutionLogRows = evolutionLogRows.slice(-200);
+            renderEvolutionLogs();
+        }
+
+        function rebuildEvolutionLogsFromHistory(rows) {
+            const arr = Array.isArray(rows) ? rows.slice(-80) : [];
+            evolutionLogRows = arr.map(r => {
+                const score = (typeof r?.score === 'number' && Number.isFinite(r.score)) ? r.score.toFixed(6) : '--';
+                const reason = String(r?.reason || r?.error || '').trim();
+                const committed = r?.committed ? ` committed=${r?.committed_strategy_id || ''}` : '';
+                const text = `iter=${r?.iteration ?? '--'} status=${r?.status || '--'} score=${score} cost=${r?.cost_ms ?? '--'}ms${reason ? ` reason=${reason}` : ''}${committed}`;
+                const level = String(r?.status || '').toLowerCase() === 'ok' ? 'success' : (String(r?.status || '').toLowerCase() === 'error' ? 'danger' : 'warning');
+                return { time: formatClockTime(r?.time) || '--', level, message: text };
+            });
+            renderEvolutionLogs();
+        }
+
+        async function startEvolutionRun() {
+            triggerEvolutionButtonFx('evolution-start-btn', 'emerald');
+            const running = !!(evolutionLastState && evolutionLastState.running);
+            if (running || evolutionStartPending || evolutionStopPending) {
+                setEvolutionStatusText('当前处于运行或操作处理中，启动按钮已锁定', 'warning');
+                return;
+            }
+            const intervalRaw = Number(document.getElementById('evolution-interval')?.value || 1);
+            const maxRaw = Number(document.getElementById('evolution-max-iterations')?.value || 0);
+            const payload = {
+                interval_seconds: Number.isFinite(intervalRaw) ? Math.max(0, intervalRaw) : 1,
+                max_iterations: Number.isFinite(maxRaw) && maxRaw > 0 ? Math.floor(maxRaw) : null
+            };
+            const seedSource = String(document.getElementById('evolution-seed-source')?.value || 'strategy_dropdown');
+            const seedId = String(document.getElementById('evolution-seed-strategy-id')?.value || '').trim();
+            const seedIds = evolutionParseListInput(document.getElementById('evolution-seed-strategy-ids')?.value || '');
+            const includeBuiltin = evolutionParseOptionalBoolean('evolution-seed-include-builtin');
+            const onlyEnabled = evolutionParseOptionalBoolean('evolution-seed-only-enabled');
+            const targetCodes = evolutionParseListInput(document.getElementById('evolution-target-stock-codes')?.value || '');
+            const timeframes = evolutionParseListInput(document.getElementById('evolution-timeframes')?.value || '');
+            const persistEnabled = evolutionParseOptionalBoolean('evolution-persist-enabled');
+            const persistThresholdRaw = Number(document.getElementById('evolution-persist-score-threshold')?.value);
+            if (seedSource === 'manual') {
+                if (seedId) payload.seed_strategy_id = seedId;
+                if (seedIds.length) payload.seed_strategy_ids = seedIds;
+            } else {
+                const fromDropdown = getEvolutionSeedIdsFromStrategyDropdown();
+                if (fromDropdown.length) payload.seed_strategy_ids = fromDropdown;
+            }
+            if (includeBuiltin !== null) payload.seed_include_builtin = includeBuiltin;
+            if (onlyEnabled !== null) payload.seed_only_enabled = onlyEnabled;
+            if (targetCodes.length) payload.target_stock_codes = targetCodes;
+            if (timeframes.length) payload.timeframes = timeframes;
+            if (persistEnabled !== null) payload.persist_enabled = persistEnabled;
+            if (Number.isFinite(persistThresholdRaw)) payload.persist_score_threshold = persistThresholdRaw;
+            evolutionStartPending = true;
+            updateEvolutionActionButtons();
+            renderEvolutionActivity({
+                phase: 'start_pending',
+                phase_label: '启动请求中',
+                message: '正在提交启动请求',
+                progress_pct: 0,
+                data_status: 'checking',
+            });
+            appendEvolutionLog('正在提交启动请求...', 'info');
+            try {
+                const startedAt = Date.now();
+                const { res, data } = await fetchJsonWithTimeout('/api/evolution/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }, 20000);
+                const elapsed = Date.now() - startedAt;
+                if (!res.ok || data.status !== 'success') {
+                    throw new Error(data.msg || '启动失败');
+                }
+                appendEvolutionLog(`已启动策略进化任务（请求耗时 ${elapsed}ms）`, 'success');
+                logMessage('策略中心', 'Evolution 已启动', 'success');
+                renderEvolutionStatus(data.state || {});
+                refreshEvolutionDashboard({ withHistory: true, withTop: true, withTimingLog: true });
+            } catch (e) {
+                const text = `Evolution 启动失败：${e.message || e}`;
+                appendEvolutionLog(text, 'danger');
+                setEvolutionStatusText(text, 'danger');
+                logMessage('策略中心', text, 'danger');
+            } finally {
+                evolutionStartPending = false;
+                updateEvolutionActionButtons();
+            }
+        }
+
+        async function stopEvolutionRun() {
+            triggerEvolutionButtonFx('evolution-stop-btn', 'rose');
+            const running = !!(evolutionLastState && evolutionLastState.running);
+            if (!running) {
+                setEvolutionStatusText('当前未运行，无需停止', 'warning');
+                return;
+            }
+            if (evolutionStartPending || evolutionStopPending) {
+                setEvolutionStatusText('当前有操作处理中，请稍候', 'warning');
+                return;
+            }
+            if (evolutionStopConfirmUntil <= Date.now()) {
+                armEvolutionStopConfirmState();
+                setEvolutionStatusText('再次点击“停止”以确认终止本次进化任务（5秒内）', 'warning');
+                return;
+            }
+            resetEvolutionStopConfirmState(false);
+            evolutionStopPending = true;
+            updateEvolutionActionButtons();
+            try {
+                const { res, data } = await fetchJsonWithTimeout('/api/evolution/stop', { method: 'POST' }, 20000);
+                if (!res.ok || data.status !== 'success') {
+                    throw new Error(data.msg || '停止失败');
+                }
+                appendEvolutionLog('已停止策略进化任务', 'warning');
+                logMessage('策略中心', 'Evolution 已停止', 'warning');
+                renderEvolutionStatus(data.state || {});
+                refreshEvolutionDashboard({ withHistory: true, withTop: true });
+            } catch (e) {
+                const text = `Evolution 停止失败：${e.message || e}`;
+                appendEvolutionLog(text, 'danger');
+                setEvolutionStatusText(text, 'danger');
+                logMessage('策略中心', text, 'danger');
+            } finally {
+                evolutionStopPending = false;
+                updateEvolutionActionButtons();
+            }
+        }
+
+        function setEvolutionStatusText(text, level = 'info') {
+            const el = document.getElementById('evolution-status-text');
+            if (!el) return;
+            el.innerText = String(text || '--');
+            if (level === 'danger') el.className = 'text-[11px] text-rose-300 font-mono';
+            else if (level === 'success') el.className = 'text-[11px] text-emerald-300 font-mono';
+            else if (level === 'warning') el.className = 'text-[11px] text-amber-300 font-mono';
+            else el.className = 'text-[11px] text-slate-300 font-mono';
+        }
+
+        function evolutionDataStatusMeta(status) {
+            const key = String(status || '').trim().toLowerCase();
+            if (key === 'ok') return { text: '数据状态：正常', cls: 'text-emerald-300' };
+            if (key === 'warning') return { text: '数据状态：异常告警', cls: 'text-amber-300' };
+            if (key === 'error') return { text: '数据状态：异常', cls: 'text-rose-300' };
+            if (key === 'checking') return { text: '数据状态：校验中', cls: 'text-cyan-300' };
+            return { text: '数据状态：待命', cls: 'text-slate-300' };
+        }
+
+        function evolutionDisplayStatus(state) {
+            const s = state && typeof state === 'object' ? state : {};
+            const running = !!s.running;
+            const raw = String(s.last_status || '').trim().toLowerCase();
+            if (!running) return raw || '--';
+            if (!raw || raw === 'starting' || raw === 'idle') {
+                const phase = String(s?.activity?.phase_label || s?.activity?.phase || '').trim();
+                return phase ? `running(${phase})` : 'running';
+            }
+            return raw;
+        }
+
+        function evolutionIterationDisplay(iteration, scenarioIndex, scenarioTotal, running = false) {
+            const iterNum = Number(iteration || 0);
+            const iterText = (Number.isFinite(iterNum) && iterNum > 0) ? String(Math.floor(iterNum)) : (running ? '1' : '--');
+            const idx = Number(scenarioIndex || 0);
+            const total = Number(scenarioTotal || 0);
+            if (Number.isFinite(idx) && Number.isFinite(total) && idx > 0 && total > 0) {
+                return `${iterText} (场景 ${Math.floor(idx)}/${Math.floor(total)})`;
+            }
+            return iterText;
+        }
+
+        function renderEvolutionActivity(activity) {
+            const act = activity && typeof activity === 'object' ? activity : {};
+            evolutionLastActivity = act;
+            const labelEl = document.getElementById('evolution-progress-label');
+            const textEl = document.getElementById('evolution-progress-text');
+            const barEl = document.getElementById('evolution-progress-bar');
+            const detailEl = document.getElementById('evolution-progress-detail');
+            const dataStatusEl = document.getElementById('evolution-data-status');
+            const phaseLabel = String(act.phase_label || act.phase || '待命');
+            const message = String(act.message || '').trim();
+            const stock = String(act.stock_code || '').trim();
+            const timeframe = String(act.timeframe || '').trim();
+            const klineRows = Number(act.kline_rows);
+            const scenarioIndex = Number(act.scenario_index || 0);
+            const scenarioTotal = Number(act.scenario_total || 0);
+            const pctRaw = Number(act.progress_pct);
+            const pct = Number.isFinite(pctRaw) ? Math.max(0, Math.min(100, Math.floor(pctRaw))) : 0;
+            if (labelEl) labelEl.innerText = `阶段：${phaseLabel}`;
+            if (textEl) textEl.innerText = `${pct}%`;
+            if (barEl) barEl.style.width = `${pct}%`;
+            const scenarioText = scenarioTotal > 0 ? ` · 场景 ${scenarioIndex}/${scenarioTotal}` : '';
+            const stockTfText = stock || timeframe ? ` · ${stock || '--'} ${timeframe || '--'}` : '';
+            const klineText = Number.isFinite(klineRows) && klineRows >= 0 ? ` · K线=${klineRows}` : '';
+            const detail = message || (phaseLabel ? `${phaseLabel}${scenarioText}${stockTfText}${klineText}` : '--');
+            if (detailEl) detailEl.innerText = `进度详情：${detail}`;
+            const statusMeta = evolutionDataStatusMeta(act.data_status);
+            if (dataStatusEl) {
+                dataStatusEl.innerText = statusMeta.text;
+                dataStatusEl.className = `${statusMeta.cls} whitespace-nowrap`;
+            }
+        }
+
+        function renderEvolutionStatus(state) {
+            const s = state && typeof state === 'object' ? state : {};
+            evolutionLastState = s;
+            renderEvolutionEffectiveProfile(s.profile || {});
+            renderEvolutionActivity(s.activity || {});
+            const running = !!s.running;
+            const iterRaw = Number(s.iteration || 0);
+            const activityIter = Number(s?.activity?.iteration || 0);
+            const iter = (Number.isFinite(iterRaw) && iterRaw > 0)
+                ? iterRaw
+                : ((Number.isFinite(activityIter) && activityIter > 0)
+                    ? activityIter
+                    : (running ? 1 : 0));
+            const scenarioIndex = Number(s?.activity?.scenario_index || 0);
+            const scenarioTotal = Number(s?.activity?.scenario_total || 0);
+            const lastStatus = evolutionDisplayStatus(s);
+            const score = s.last_score;
+            const scoreText = (typeof score === 'number' && Number.isFinite(score)) ? score.toFixed(6) : '--';
+            const runningText = running ? '运行中' : '已停止';
+            const pill = document.getElementById('evolution-status-pill');
+            const runningEl = document.getElementById('evolution-running');
+            const iterEl = document.getElementById('evolution-iteration');
+            const lsEl = document.getElementById('evolution-last-status');
+            const scoreEl = document.getElementById('evolution-last-score');
+            if (pill) {
+                pill.innerText = runningText;
+                pill.className = running ? 'text-[11px] text-emerald-300 font-mono' : 'text-[11px] text-slate-300 font-mono';
+            }
+            if (runningEl) runningEl.innerText = runningText;
+            if (iterEl) iterEl.innerText = evolutionIterationDisplay(iter, scenarioIndex, scenarioTotal, running);
+            if (lsEl) lsEl.innerText = lastStatus;
+            if (scoreEl) scoreEl.innerText = scoreText;
+            if (evolutionLastRunning === null) {
+                evolutionLastRunning = running;
+            } else if (evolutionLastRunning !== running) {
+                appendEvolutionLog(running ? '运行状态切换为：运行中' : '运行状态切换为：已停止', running ? 'success' : 'warning');
+                evolutionLastRunning = running;
+            }
+            if (String(s.last_error || '').trim()) {
+                setEvolutionStatusText(`异常: ${s.last_error}`, 'danger');
+            } else {
+                const progressPct = Number(s?.activity?.progress_pct);
+                const progressText = Number.isFinite(progressPct) ? `${Math.max(0, Math.min(100, Math.floor(progressPct)))}%` : '--';
+                setEvolutionStatusText(`状态 ${lastStatus} · 进度 ${progressText} · started=${s.started_at || '--'} · finished=${s.finished_at || '--'}`, running ? 'success' : 'info');
+            }
+            renderEvolutionConclusion();
+        }
+
+        function applyEvolutionProgress(progress) {
+            const p = progress && typeof progress === 'object' ? progress : {};
+            renderEvolutionActivity(p);
+            const iterFromProgress = Number(p.iteration || 0);
+            const scenarioIndex = Number(p.scenario_index || 0);
+            const scenarioTotal = Number(p.scenario_total || 0);
+            if (Number.isFinite(iterFromProgress) && iterFromProgress > 0) {
+                const iterEl = document.getElementById('evolution-iteration');
+                if (iterEl) iterEl.innerText = evolutionIterationDisplay(iterFromProgress, scenarioIndex, scenarioTotal, true);
+                if (evolutionLastState && typeof evolutionLastState === 'object') {
+                    evolutionLastState.iteration = Math.max(Number(evolutionLastState.iteration || 0), iterFromProgress);
+                }
+            } else if (evolutionLastState?.running && Number(evolutionLastState?.iteration || 0) <= 0) {
+                const iterEl = document.getElementById('evolution-iteration');
+                if (iterEl) iterEl.innerText = evolutionIterationDisplay(1, scenarioIndex, scenarioTotal, true);
+            }
+            const msg = String(p.message || '').trim();
+            const phaseLabel = String(p.phase_label || p.phase || '执行中');
+            const pctRaw = Number(p.progress_pct);
+            const pct = Number.isFinite(pctRaw) ? Math.max(0, Math.min(100, Math.floor(pctRaw))) : null;
+            if (!msg && !phaseLabel) return;
+            const scenarioText = scenarioTotal > 0 ? ` · 场景${scenarioIndex}/${scenarioTotal}` : '';
+            const status = String(p.data_status || '').toLowerCase();
+            const level = status === 'error' ? 'danger' : (status === 'warning' ? 'warning' : (status === 'ok' ? 'success' : 'info'));
+            const text = `${phaseLabel}${pct === null ? '' : ` ${pct}%`}${scenarioText}${msg ? ` · ${msg}` : ''}`;
+            appendEvolutionLog(text, level);
+            if (evolutionLastState && evolutionLastState.running) {
+                evolutionLastState.last_status = 'running';
+                setEvolutionStatusText(text, level === 'danger' ? 'danger' : 'info');
+                const lsEl = document.getElementById('evolution-last-status');
+                if (lsEl) lsEl.innerText = evolutionDisplayStatus(evolutionLastState);
+            }
+        }
+
+        function renderEvolutionHistory(rows) {
+            const wrap = document.getElementById('evolution-history-wrap');
+            if (!wrap) return;
+            const arr = Array.isArray(rows) ? rows.slice(-30).reverse() : [];
+            evolutionHistoryRows = Array.isArray(rows) ? rows.slice() : [];
+            renderEvolutionSummary(evolutionHistoryRows);
+            renderEvolutionConclusion();
+            renderEvolutionThresholdRecommendation();
+            if (!arr.length) {
+                const running = !!(evolutionLastState && evolutionLastState.running);
+                const activity = evolutionLastState?.activity || {};
+                const phase = String(activity?.phase_label || activity?.phase || '执行中');
+                wrap.innerHTML = running ? `<div class="text-cyan-300">首轮结果尚未产出，当前阶段：${evolutionEscapeHtml(phase)}</div>` : '<div class="text-slate-500">暂无</div>';
+                return;
+            }
+            wrap.innerHTML = arr.map(r => {
+                const score = (typeof r.score === 'number' && Number.isFinite(r.score)) ? r.score.toFixed(4) : '--';
+                const reason = String(r.reason || r.error || '').trim();
+                const parent = String(r.parent_strategy_id || r.parent_strategy_name || '--');
+                const tf = String(r.best_timeframe || '--');
+                const stock = String(r.best_stock_code || '--');
+                const committed = r.committed ? ` <span class="text-emerald-300">[入库:${evolutionEscapeHtml(r.committed_strategy_id || '--')}]</span>` : '';
+                const reasonHtml = reason ? `<span class="text-rose-300"> · reason=${evolutionEscapeHtml(reason)}</span>` : '';
+                return `<div>[${evolutionEscapeHtml(r.time || '--')}] #${evolutionEscapeHtml(r.iteration || '--')} ${evolutionEscapeHtml(r.status || '--')} score=${evolutionEscapeHtml(score)} cost=${evolutionEscapeHtml(r.cost_ms || '--')}ms · parent=${evolutionEscapeHtml(parent)} · tf=${evolutionEscapeHtml(tf)} · stock=${evolutionEscapeHtml(stock)}${reasonHtml}${committed}</div>`;
+            }).join('');
+        }
+
+        function renderEvolutionTop(rows) {
+            const wrap = document.getElementById('evolution-top-wrap');
+            if (!wrap) return;
+            const arr = Array.isArray(rows) ? rows.slice(0, 15) : [];
+            evolutionTopRows = Array.isArray(rows) ? rows.slice() : [];
+            renderEvolutionConclusion();
+            if (!arr.length) {
+                const running = !!(evolutionLastState && evolutionLastState.running);
+                wrap.innerHTML = running ? '<div class="text-cyan-300">Top策略将在首轮评分完成后展示</div>' : '<div class="text-slate-500">暂无</div>';
+                return;
+            }
+            wrap.innerHTML = arr.map((r, idx) => {
+                const score = Number(r?.score || 0);
+                const code = String(r?.strategy_code || '').replace(/\s+/g, ' ').slice(0, 22);
+                const metrics = r?.metrics || {};
+                const sharpe = evolutionFormatNumber(metrics.sharpe, 2);
+                const win = evolutionFormatNumber(metrics.win_rate, 2);
+                const dd = evolutionFormatNumber(metrics.drawdown, 2);
+                return `<button onclick="openEvolutionTopDetail(${idx})" class="w-full text-left hover:text-cyan-300">#${idx + 1} ${score.toFixed(4)} · sharpe=${sharpe} win=${win} dd=${dd} · ${evolutionEscapeHtml(code || '--')}</button>`;
+            }).join('');
+        }
+
+        function openEvolutionTopDetail(index) {
+            const i = Number(index);
+            if (!Number.isFinite(i) || i < 0 || i >= evolutionTopRows.length) return;
+            const row = evolutionTopRows[i] || {};
+            const modal = document.getElementById('evolution-top-detail-modal');
+            const meta = document.getElementById('evolution-top-detail-meta');
+            const metrics = document.getElementById('evolution-top-detail-metrics');
+            const code = document.getElementById('evolution-top-detail-code');
+            const score = Number(row?.score || 0);
+            if (meta) meta.innerText = `#${i + 1} · score=${score.toFixed(6)} · ${row?.created_at || '--'}`;
+            if (metrics) metrics.innerText = JSON.stringify(row?.metrics || {}, null, 2);
+            if (code) code.innerText = String(row?.strategy_code || '--');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeEvolutionTopDetail() {
+            const modal = document.getElementById('evolution-top-detail-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function applyEvolutionTick(row) {
+            const record = row && typeof row === 'object' ? row : null;
+            if (!record) return;
+            const score = (typeof record.score === 'number' && Number.isFinite(record.score)) ? record.score.toFixed(6) : '--';
+            const statusLower = String(record.status || '').toLowerCase();
+            setEvolutionStatusText(`迭代 ${record.iteration || '--'} · ${record.status || '--'} · score=${score}`, statusLower === 'ok' ? 'success' : (statusLower === 'error' ? 'danger' : 'warning'));
+            const reason = String(record.reason || record.error || '').trim();
+            const msg = `迭代${record.iteration || '--'} status=${record.status || '--'} score=${score} cost=${record.cost_ms || '--'}ms${reason ? ` reason=${reason}` : ''}${record.committed ? ` committed=${record.committed_strategy_id || '--'}` : ''}`;
+            appendEvolutionLog(msg, statusLower === 'ok' ? 'success' : (statusLower === 'error' ? 'danger' : 'warning'));
+            const next = Array.isArray(evolutionHistoryRows) ? evolutionHistoryRows.slice() : [];
+            next.push(record);
+            renderEvolutionHistory(next.slice(-100));
+            if (record.status === 'ok' && Number(record.iteration || 0) % 3 === 0) {
+                refreshEvolutionDashboard({ withTop: true });
+            }
+        }
+
+        function applyEvolutionState(state) {
+            renderEvolutionStatus(state || {});
+            const running = !!state?.running;
+            updateEvolutionActionButtons(running);
+        }
+
+        async function refreshEvolutionDashboard(options = {}) {
+            const withHistory = options.withHistory !== false;
+            const withTop = options.withTop !== false;
+            const withTimingLog = options.withTimingLog === true;
+            try {
+                const started = Date.now();
+                const reqs = [fetchJsonWithTimeout('/api/evolution/status', {}, 10000)];
+                if (withHistory) reqs.push(fetchJsonWithTimeout('/api/evolution/history?limit=80', {}, 10000));
+                if (withTop) reqs.push(fetchJsonWithTimeout('/api/evolution/top?k=15', {}, 10000));
+                const results = await Promise.all(reqs);
+                const elapsed = Date.now() - started;
+                if (withTimingLog) {
+                    appendEvolutionLog(`看板数据刷新完成，耗时 ${elapsed}ms`, elapsed > 3500 ? 'warning' : 'info');
+                }
+                const statusResp = results[0];
+                if (statusResp.res.ok && statusResp.data.status === 'success') {
+                    applyEvolutionState(statusResp.data.state || {});
+                }
+                let idx = 1;
+                if (withHistory) {
+                    const historyResp = results[idx++];
+                    if (historyResp.res.ok && historyResp.data.status === 'success') {
+                        renderEvolutionHistory(historyResp.data.rows || []);
+                        rebuildEvolutionLogsFromHistory(historyResp.data.rows || []);
+                    }
+                }
+                if (withTop) {
+                    const topResp = results[idx++];
+                    if (topResp.res.ok && topResp.data.status === 'success') {
+                        renderEvolutionTop(topResp.data.rows || []);
+                    }
+                }
+            } catch (e) {
+                if (withTimingLog) {
+                    appendEvolutionLog(`看板数据刷新失败：${e?.message || e}`, 'warning');
+                }
+            }
+        }
+
         function logMessage(module, message, type = 'info', eventClock = '') {
             const timeline = document.getElementById('imperial-timeline');
             const el = document.createElement('div');
@@ -9688,6 +10990,12 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         document.getElementById('webhook-retry-modal')?.addEventListener('click', (e) => {
             if (e.target && e.target.id === 'webhook-retry-modal') closeWebhookRetryCenter();
         });
+        document.getElementById('evolution-top-detail-modal')?.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'evolution-top-detail-modal') closeEvolutionTopDetail();
+        });
+        document.getElementById('evolution-seed-source')?.addEventListener('change', renderEvolutionSeedSourceUi);
+        document.getElementById('evolution-seed-search')?.addEventListener('input', renderEvolutionSeedSourceUi);
+        document.getElementById('strategy-multi-search')?.addEventListener('input', updateStrategyMultiListUI);
         document.addEventListener('keydown', (e) => {
             try {
                 const hardReload = !!(e && e.ctrlKey && !e.shiftKey && String(e.key || '').toLowerCase() === 'f5');
@@ -9697,6 +11005,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             } catch (_) {}
             if (e && e.key === 'Escape') {
                 closeOpsHubModal();
+                closeEvolutionTopDetail();
             }
         });
         window.addEventListener('resize', () => {
@@ -9725,7 +11034,13 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         setInterval(() => {
             syncStatus();
         }, 3000);
+        setInterval(() => {
+            // Evolution 默认走 WS 推送，此处仅做兜底修正，避免网络抖动导致的状态漂移
+            refreshEvolutionDashboard({ withHistory: false, withTop: false });
+        }, 10000);
         scheduleStrategyRegimeHintRefresh(true);
+        refreshEvolutionDashboard({ withHistory: true, withTop: true });
+        renderEvolutionSeedSourceUi();
         setTimeout(() => {
             if (!strategyCatalog.length) fetchGlobalStrategies();
         }, 800);

@@ -16,6 +16,7 @@ class ConfigLoader:
         "data_provider.default_api_url",
         "webhook_notification.feishu_webhook_url",
         "webhook_notification.feishu_secret",
+        "evolution.llm.api_key",
     }
     _default_private_passthrough_paths = {
         "targets",

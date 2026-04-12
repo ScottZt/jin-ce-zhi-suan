@@ -10,12 +10,14 @@ import traceback
 import math
 import numbers
 import re
+import time
 import urllib.request
 import urllib.error
 import io
 import subprocess
 import threading
 import uuid
+from collections import deque
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -58,6 +60,7 @@ from src.utils.webhook_notifier import WebhookNotifier
 from src.tdx.formula_compiler import compile_tdx_formula, get_tdx_compile_capabilities
 from src.tdx.terminal_bridge import TdxTerminalBridge
 from src.utils.blk_loader import parse_blk_file, parse_blk_text
+from src.evolution.core.runtime_manager import EvolutionRuntimeManager
 
 import logging
 
@@ -91,6 +94,9 @@ _QUIET_HTTP_PATHS = {
     "/api/config",
     "/api/config/save",
     "/api/live/fund_pool",
+    "/api/evolution/status",
+    "/api/evolution/history",
+    "/api/evolution/top",
 }
 
 class _UvicornAccessPathFilter(logging.Filter):
@@ -228,6 +234,65 @@ batch_run_state: Dict[str, Any] = {
     "parallel_workers": 1,
     "logs": [],
 }
+evolution_runtime = EvolutionRuntimeManager()
+evolution_ws_events = deque(maxlen=2000)
+evolution_ws_lock = threading.Lock()
+evolution_ws_pump_task = None
+_ws_event_last_emit_ts: Dict[str, float] = {}
+_WS_EVENT_THROTTLE_SECONDS = {
+    "backtest_progress": 0.8,
+    "backtest_flow": 0.8,
+    "backtest_trade": 0.5,
+    "ministry_tick": 0.3,
+    "market": 0.25,
+    "live_tick": 0.5,
+}
+_WS_SKIP_WEBHOOK_EVENT_TYPES = {"backtest_progress", "backtest_flow", "backtest_trade", "ministry_tick", "market", "live_tick"}
+
+
+def _push_evolution_ws_event(payload: Dict[str, Any]) -> None:
+    if not isinstance(payload, dict):
+        return
+    with evolution_ws_lock:
+        evolution_ws_events.append(dict(payload))
+
+
+def _pop_all_evolution_ws_events() -> List[Dict[str, Any]]:
+    with evolution_ws_lock:
+        items = list(evolution_ws_events)
+        evolution_ws_events.clear()
+    return items
+
+
+async def _evolution_ws_pump_loop():
+    while True:
+        try:
+            items = _pop_all_evolution_ws_events()
+            for item in items:
+                kind = str(item.get("kind", "")).strip().lower()
+                if kind == "tick":
+                    payload = {"type": "evolution_tick", "data": item.get("record", {}), "server_time": datetime.now().isoformat(timespec="seconds")}
+                elif kind == "progress":
+                    payload = {"type": "evolution_progress", "data": item.get("progress", {}), "server_time": datetime.now().isoformat(timespec="seconds")}
+                else:
+                    payload = {"type": "evolution_state", "data": item.get("state", {}), "server_time": datetime.now().isoformat(timespec="seconds")}
+                await manager.broadcast(payload)
+        except Exception as e:
+            logger.error("evolution ws pump failed: %s", e, exc_info=True)
+        await asyncio.sleep(0.2)
+
+
+def _allow_ws_emit(event_type: str) -> bool:
+    et = str(event_type or "").strip()
+    throttle = float(_WS_EVENT_THROTTLE_SECONDS.get(et, 0.0) or 0.0)
+    if throttle <= 0:
+        return True
+    now = time.monotonic()
+    last = float(_ws_event_last_emit_ts.get(et, 0.0) or 0.0)
+    if last > 0 and (now - last) < throttle:
+        return False
+    _ws_event_last_emit_ts[et] = now
+    return True
 
 def _project_rel_path(path: str) -> str:
     try:
@@ -1864,6 +1929,19 @@ class BatchCombinationRecommendRequest(BaseModel):
     strategy_profiles: Optional[List[Dict[str, Any]]] = None
     max_tokens: Optional[int] = 600
     temperature: Optional[float] = 0.2
+
+
+class EvolutionStartRequest(BaseModel):
+    interval_seconds: Optional[float] = 1.0
+    max_iterations: Optional[int] = None
+    seed_strategy_id: Optional[str] = None
+    seed_strategy_ids: Optional[List[str]] = None
+    seed_include_builtin: Optional[bool] = None
+    seed_only_enabled: Optional[bool] = None
+    target_stock_codes: Optional[List[str]] = None
+    timeframes: Optional[List[str]] = None
+    persist_enabled: Optional[bool] = None
+    persist_score_threshold: Optional[float] = None
 
 
 def _extract_code_block(text):
@@ -4170,15 +4248,8 @@ async def api_strategy_manager_delete(req: StrategyDeleteRequest):
         sid = str(req.strategy_id or "").strip()
         if not sid:
             return {"status": "error", "msg": "strategy_id is required"}
-        if _is_protected_strategy(sid) and (not req.force):
-            return {"status": "error", "msg": f"strategy {sid} is protected and cannot be deleted"}
-        meta = _find_strategy_meta(sid)
-        if isinstance(meta, dict):
-            if bool(meta.get("enabled", False)) and (not req.force):
-                return {"status": "error", "msg": f"strategy {sid} is enabled, disable it before delete"}
-        dependents = list_strategy_dependents(sid)
-        if dependents and (not req.force):
-            return {"status": "error", "msg": f"strategy {sid} is referenced by: {','.join(dependents)}"}
+        if not req.force:
+            return {"status": "error", "msg": "请勾选强制删除后再执行删除"}
         deleted = delete_strategy(sid)
         return {"status": "success" if deleted else "info", "deleted": bool(deleted)}
     except Exception as e:
@@ -5362,6 +5433,60 @@ async def api_get_status_light():
     """Get lightweight system status for high-frequency polling"""
     return _build_status_payload(include_fund_pools=False)
 
+
+def _build_evolution_profile_payload(req: EvolutionStartRequest) -> Dict[str, Any]:
+    profile: Dict[str, Any] = {}
+    if req.seed_strategy_id is not None:
+        profile["seed_strategy_id"] = str(req.seed_strategy_id or "").strip()
+    if req.seed_strategy_ids is not None:
+        profile["seed_strategy_ids"] = [str(x or "").strip() for x in req.seed_strategy_ids if str(x or "").strip()]
+    if req.seed_include_builtin is not None:
+        profile["seed_include_builtin"] = bool(req.seed_include_builtin)
+    if req.seed_only_enabled is not None:
+        profile["seed_only_enabled"] = bool(req.seed_only_enabled)
+    if req.target_stock_codes is not None:
+        profile["target_stock_codes"] = [str(x or "").strip() for x in req.target_stock_codes if str(x or "").strip()]
+    if req.timeframes is not None:
+        profile["timeframes"] = [str(x or "").strip() for x in req.timeframes if str(x or "").strip()]
+    if req.persist_enabled is not None:
+        profile["persist_enabled"] = bool(req.persist_enabled)
+    if req.persist_score_threshold is not None:
+        profile["persist_score_threshold"] = float(req.persist_score_threshold)
+    return profile
+
+
+@app.post("/api/evolution/start")
+async def api_evolution_start(req: EvolutionStartRequest):
+    interval = float(req.interval_seconds if req.interval_seconds is not None else 1.0)
+    max_iters = req.max_iterations if req.max_iterations is not None else None
+    profile = _build_evolution_profile_payload(req)
+    state = evolution_runtime.start(interval_seconds=interval, max_iterations=max_iters, profile=profile)
+    return {"status": "success", "msg": "evolution started", "state": state}
+
+
+@app.post("/api/evolution/stop")
+async def api_evolution_stop():
+    state = evolution_runtime.stop()
+    return {"status": "success", "msg": "evolution stopped", "state": state}
+
+
+@app.get("/api/evolution/status")
+async def api_evolution_status():
+    return {"status": "success", "state": evolution_runtime.status()}
+
+
+@app.get("/api/evolution/history")
+async def api_evolution_history(limit: int = 100):
+    rows = evolution_runtime.history(limit=max(1, min(int(limit or 100), 1000)))
+    return {"status": "success", "rows": rows, "count": len(rows)}
+
+
+@app.get("/api/evolution/top")
+async def api_evolution_top(k: int = 20):
+    rows = evolution_runtime.top_strategies(k=max(1, min(int(k or 20), 200)))
+    return {"status": "success", "rows": rows, "count": len(rows)}
+
+
 @app.get("/api/live/fund_pool")
 async def api_get_live_fund_pool(stock_code: Optional[str] = None, include_transactions: bool = False, tx_limit: int = 200):
     limit = max(1, min(int(tx_limit or 200), 5000))
@@ -6056,13 +6181,13 @@ async def emit_event_to_ws(event_type, data, stock_code=None, report_id=None, br
     }
     if stock_code:
         payload["stock_code"] = stock_code
-    if broadcast_ws:
+    if broadcast_ws and _allow_ws_emit(event_type):
         await manager.broadcast(payload)
     if stock_code and event_type != "system":
         if event_type == "daily_summary":
             await _notify_daily_summary_once(stock_code=stock_code, data=emit_data)
-        elif _should_notify_webhook_by_category(event_type=event_type, data=emit_data):
-            await webhook_notifier.notify(event_type=event_type, data=emit_data, stock_code=stock_code)
+        elif event_type not in _WS_SKIP_WEBHOOK_EVENT_TYPES and _should_notify_webhook_by_category(event_type=event_type, data=emit_data):
+            asyncio.create_task(webhook_notifier.notify(event_type=event_type, data=emit_data, stock_code=stock_code))
 
 async def _broadcast_system_and_notify(msg: str, stock_codes=None):
     text = str(msg or "").strip()
@@ -6088,7 +6213,7 @@ async def _broadcast_system_and_notify(msg: str, stock_codes=None):
 
 @app.on_event("startup")
 async def startup_event():
-    global history_sync_scheduler_task, startup_server_host, startup_server_port
+    global history_sync_scheduler_task, startup_server_host, startup_server_port, evolution_ws_pump_task
     _apply_log_level()
     logging.getLogger("uvicorn.access").addFilter(_UvicornAccessPathFilter())
     logger.info("Initializing Cabinet Server...")
@@ -6108,6 +6233,9 @@ async def startup_event():
     _startup_private_data_check(cfg)
     if bool(cfg.get("history_sync.scheduler_enabled", False)):
         history_sync_scheduler_task = asyncio.create_task(_history_sync_scheduler_loop())
+    evolution_runtime.set_event_sink(_push_evolution_ws_event)
+    if evolution_ws_pump_task is None or evolution_ws_pump_task.done():
+        evolution_ws_pump_task = asyncio.create_task(_evolution_ws_pump_loop())
     server_host = startup_server_host if startup_server_host else _server_host(cfg)
     server_port = startup_server_port if startup_server_port else _server_port(cfg)
     access_host = "localhost" if server_host in {"0.0.0.0", "::"} else server_host
@@ -6115,13 +6243,17 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    global history_sync_scheduler_task
+    global history_sync_scheduler_task, evolution_ws_pump_task
     if cabinet_task:
         cabinet_task.cancel()
     if _live_running_codes():
         await _stop_live_tasks()
     if history_sync_scheduler_task and not history_sync_scheduler_task.done():
         history_sync_scheduler_task.cancel()
+    evolution_runtime.set_event_sink(None)
+    evolution_runtime.stop()
+    if evolution_ws_pump_task and not evolution_ws_pump_task.done():
+        evolution_ws_pump_task.cancel()
 
 if __name__ == "__main__":
     import uvicorn

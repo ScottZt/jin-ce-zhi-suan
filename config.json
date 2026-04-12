@@ -22,12 +22,12 @@
     ]
   },
   "data_provider": {
-    "source": "default",
+    "source": "mysql",
     "enable_fallback": false,
     "tushare_token": "",
     "default_api_key": "",
     "default_api_url": "",
-    "mysql_host": "127.0.0.1",
+    "mysql_host": "192.168.18.62",
     "mysql_port": 3306,
     "mysql_user": "root",
     "mysql_password": "",
@@ -68,7 +68,7 @@
     "strategy_llm_model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
     "strategy_llm_timeout_sec": 240,
     "api_key": "",
-    "adjustment_mode": "hfq"
+    "adjustment_mode": "none"
   },
   "history_sync": {
     "scheduler_enabled": false,
@@ -233,7 +233,7 @@
         }
       }
     },
-    "last_applied_profile": "cn_equity_mid_long",
+    "last_applied_profile": "cn_equity_intraday",
     "last_applied_market": "A股"
   },
   "live_monitoring": {
@@ -380,6 +380,21 @@
       "dynamic_order_qty": 350,
       "max_dynamic_qty": 1050,
       "stop_loss_pct": 0.05
+    }
+  },
+  "evolution": {
+    "llm": {
+      "enabled": false,
+      "provider": "",
+      "model": "",
+      "base_url": "",
+      "timeout_seconds": 0,
+      "retry_times": 0,
+      "api_key": "",
+      "fallback_to_mock": false,
+      "temperature": 0,
+      "max_tokens": 0,
+      "system_prompt": ""
     }
   }
 }

@@ -1,0 +1,71 @@
+新功能-时间驱动多Agent策略进化-预发布说明
+**亮点**
+- 事件驱动解耦：多Agent不直接互相调用，统一通过事件总线通信，扩展新Agent时对现有链路影响小。
+- 无侵入接入：不改原回测引擎与策略基类，Evolution 作为增量层独立演进。
+- 自动闭环：实现 `生成 -> 审核 -> 回测 -> 评分/记忆 -> 下一轮` 的持续进化循环。
+- 双通道可观测：前台可通过 API 拉取状态，也可通过 WebSocket 接收实时 `evolution_state/evolution_tick` 事件。
+- 工程稳态优化：对高频事件做节流与降压，降低回测过程中的前后台互相拖慢。
+
+**原理**
+- 核心中枢是 `EventBus`：`subscribe(event_type, handler)` 注册监听，`publish(event_type, data)` 分发事件。
+- Agent职责分工：
+- `Researcher` 基于历史策略生成候选策略并发布 `StrategyGenerated`。
+- `Critic` 做硬规则审查，发布 `StrategyApproved` 或 `StrategyRejected`。
+- `Trader` 调用回测适配器执行并发布 `BacktestFinished`。
+- `MemoryAgent` 统一评分并持久化，发布 `StrategyScored`。
+- `Orchestrator` 只负责装配与触发起点 `Start`，其余由事件链自然推进。
+- 运行管理：
+- `EvolutionRuntimeManager` 在后台线程循环执行 `run_once`，记录历史、维护状态，并通过事件 sink 向服务端推送运行态。
+- 服务端再将运行事件转换为 WebSocket 消息推送到前台看板。
+
+
+
+**效果说明**
+- 研发效率：从“人工单次试验”升级为“自动连续迭代”，策略产出更稳定。
+- 质量控制：硬规则前置拦截，减少无效/违规策略进入回测阶段。
+- 性能体验：高频推送降压后，回测中前台操作卡顿显著降低，进度展示更贴近后台真实状态。
+- 可运营性：有状态、有历史、有Top榜单与详情，支持日常监控、回放与复盘。
+- 可扩展性：后续可平滑接入真实LLM、数据库持久化、更多Agent，不需推翻现有结构。
+
+**本轮升级（全量策略选种 + append版本入库 + 中间不落库 + 多标的多周期评分）**
+- 策略选种来源升级为全量策略库（内置+自定义），支持人为指定起点策略ID与策略范围ID集合。
+- 进化成功策略采用追加新增模式写入全量策略库，不覆盖原策略，版本按父策略维度递增（v1、v2、v3...）。
+- 进化过程中的中间候选策略不写入全量策略库，仅在事件流中参与审核与回测。
+- 评分升级为多标的、多时间周期聚合评分：对标的池与周期集合逐一回测后聚合指标，再统一打分。
+
+**新增配置（配置中心建议增加）**
+- `evolution.seed.strategy_id`：指定单个起点策略ID（可选）
+- `evolution.seed.strategy_ids`：指定允许进化的策略ID范围（可选，数组）
+- `evolution.seed.include_builtin`：是否允许内置策略参与选种（默认 true）
+- `evolution.seed.only_enabled`：是否仅从启用策略选种（默认 true）
+- `evolution.evaluation.stock_codes`：多标的评估池（为空时回退全局 `targets`）
+- `evolution.evaluation.timeframes`：多周期评估集合（如 `["1min","5min","15min"]`）
+- `evolution.persist.enabled`：是否启用进化成功入库（默认 true）
+- `evolution.persist.score_threshold`：入库分数阈值（默认 0.2）
+
+**新增事件与数据流**
+- `Start`：携带 profile（选种范围、评估标的、评估周期、入库阈值）
+- `StrategyGenerated`：携带候选策略代码与父策略标识
+- `StrategyApproved/Rejected`：审核结果与上下文透传
+- `BacktestFinished`：多场景聚合指标（含 best_stock_code、best_timeframe）
+- `StrategyScored`：统一评分结果（仅用于记忆与是否入库判定）
+- `StrategyCommitted`：达到阈值后成功追加入库事件（含新策略ID、父策略ID、版本）
+
+**启动接口参数（可覆盖配置）**
+- `POST /api/evolution/start` 现支持在启动时传入 profile 覆盖项，优先级高于配置中心默认值，仅对本次运行生效。
+- 可传字段：`seed_strategy_id`、`seed_strategy_ids`、`seed_include_builtin`、`seed_only_enabled`、`target_stock_codes`、`timeframes`、`persist_enabled`、`persist_score_threshold`。
+- 示例请求体：
+```json
+{
+  "interval_seconds": 1,
+  "max_iterations": 20,
+  "seed_strategy_id": "09",
+  "seed_strategy_ids": ["09", "34A", "58"],
+  "seed_include_builtin": true,
+  "seed_only_enabled": true,
+  "target_stock_codes": ["000001.SZ", "600519.SH"],
+  "timeframes": ["1min", "5min", "15min"],
+  "persist_enabled": true,
+  "persist_score_threshold": 0.25
+}
+```
