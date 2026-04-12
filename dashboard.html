@@ -1748,6 +1748,7 @@
                                 <th class="px-3 py-2 text-left sticky top-0 z-20 bg-slate-800">策略详情说明</th>
                                 <th class="px-3 py-2 text-left sticky top-0 z-20 bg-slate-800">策略代码</th>
                                 <th class="px-3 py-2 text-left sticky top-0 z-20 bg-slate-800">原始需求</th>
+                                <th class="px-3 py-2 text-left sticky top-0 z-20 bg-slate-800">使用提醒</th>
                                 <th class="px-3 py-2 text-left sticky top-0 z-20 bg-slate-800">评分</th>
                                 <th class="px-3 py-2 text-left sticky top-0 z-20 bg-slate-800">
                                     <button onclick="toggleStrategyManagerPositionSort()" class="inline-flex items-center gap-1 hover:text-white">
@@ -2421,6 +2422,8 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
         ];
         let patternPickerRendered = false;
         let patternKlineCache = {};
+        let patternThumbStatusTimer = null;
+        const patternThumbReadyMap = {};
         
         function wsUrl() {
             const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -7782,6 +7785,11 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 const sourceLabel = String(r.source_label || (r.source === 'market' ? '行情驱动' : (r.source === 'human' ? '用户输入' : '--')));
                 const klineType = String(r.kline_type || '--');
                 const rawTitle = String(r.raw_requirement_title || '原始需求');
+                const usageNotice = String(r.usage_notice || '').trim();
+                const isBuiltin = !!r.builtin || String(r.source || '').toLowerCase() === 'builtin';
+                const usageHtml = isBuiltin
+                    ? `<span class="inline-flex items-center px-2 py-0.5 rounded border border-rose-500 bg-rose-900/40 text-rose-300 text-[11px] font-semibold">⚠ 内置策略提醒</span><div class="mt-1 text-rose-200">${shortText(usageNotice || '当前为内置策略，仅供测试研究使用，非投资建议，不构成买卖依据。')}</div>`
+                    : `<span class="text-slate-500">--</span>`;
                 const scoreRaw = r.score_total;
                 const scoreText = (scoreRaw === null || scoreRaw === undefined || !Number.isFinite(Number(scoreRaw))) ? '--' : Number(scoreRaw).toFixed(1);
                 const ratingText = String(r.rating || '').trim();
@@ -7799,6 +7807,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                         <td class="px-3 py-2 text-slate-300">${shortText(r.analysis_text || '')}</td>
                         <td class="px-3 py-2 text-cyan-300 font-mono">${shortText(r.code || '')}</td>
                         <td class="px-3 py-2 text-slate-300"><span class="text-slate-500">${rawTitle}：</span>${shortText(r.raw_requirement || '')}</td>
+                        <td class="px-3 py-2">${usageHtml}</td>
                         <td class="px-3 py-2 text-yellow-300 font-mono">${scoreText}${ratingText ? `<span class="ml-1 text-slate-400">${ratingText}</span>` : ''}</td>
                         <td class="px-3 py-2 ${regimePos.cls}">${posText}<span class="ml-1 text-[10px] text-slate-500">(${regimeTag})</span></td>
                         <td class="px-3 py-2 ${statusCls}">${statusTxt}</td>
@@ -9358,6 +9367,60 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
             return patternKlineCache[key];
         }
 
+        function getPatternThumbStatusUrl(item) {
+            const q = `stock=${encodeURIComponent(item.stockCode)}&start=${encodeURIComponent(item.start)}&end=${encodeURIComponent(item.end)}`;
+            return `/api/backtest/kline_thumb_status?${q}`;
+        }
+
+        async function refreshPatternThumbReadiness() {
+            const modal = document.getElementById('pattern-picker-modal');
+            if (!modal || modal.classList.contains('hidden')) {
+                stopPatternThumbStatusPolling();
+                return;
+            }
+            const pendingItems = CLASSIC_PATTERNS.filter(item => !patternThumbReadyMap[item.id]);
+            if (pendingItems.length === 0) {
+                if (patternThumbStatusTimer) {
+                    clearInterval(patternThumbStatusTimer);
+                    patternThumbStatusTimer = null;
+                }
+                return;
+            }
+            await Promise.all(pendingItems.map(async item => {
+                try {
+                    const res = await fetch(getPatternThumbStatusUrl(item));
+                    const data = await res.json();
+                    const ready = data && data.status === 'success' && !!data.ready;
+                    const img = document.getElementById(`pattern-kline-${item.id}`);
+                    if (!img) return;
+                    if (ready) {
+                        patternThumbReadyMap[item.id] = true;
+                        img.style.objectFit = 'cover';
+                        const sep = getPatternThumbUrl(item).includes('?') ? '&' : '?';
+                        img.src = `${getPatternThumbUrl(item)}${sep}_ts=${Date.now()}`;
+                    } else {
+                        img.style.objectFit = 'contain';
+                    }
+                } catch (_) {
+                }
+            }));
+        }
+
+        function startPatternThumbStatusPolling() {
+            if (patternThumbStatusTimer) {
+                clearInterval(patternThumbStatusTimer);
+                patternThumbStatusTimer = null;
+            }
+            refreshPatternThumbReadiness();
+            patternThumbStatusTimer = setInterval(refreshPatternThumbReadiness, 1500);
+        }
+
+        function stopPatternThumbStatusPolling() {
+            if (!patternThumbStatusTimer) return;
+            clearInterval(patternThumbStatusTimer);
+            patternThumbStatusTimer = null;
+        }
+
         function applyPatternSelection(item) {
             const stockInput = document.getElementById('stock-search-input');
             const rangeSelect = document.getElementById('bt-range-select');
@@ -9407,7 +9470,7 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 const img = document.getElementById(`pattern-kline-${item.id}`);
                 if (!img) return;
                 img.onerror = () => {
-                    img.alt = '无K线数据';
+                    img.alt = '经典形态缩略图加载中';
                     img.style.objectFit = 'contain';
                 };
             });
@@ -9420,11 +9483,13 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 patternPickerRendered = true;
                 renderPatternPickerGrid();
             }
+            startPatternThumbStatusPolling();
         }
 
         function closePatternPicker() {
             const modal = document.getElementById('pattern-picker-modal');
             if (modal) modal.classList.add('hidden');
+            stopPatternThumbStatusPolling();
         }
         
         function updateBacktestProgress(data) {

@@ -26,6 +26,7 @@ _BUILTIN_STRATEGY_CLASSES = {
     "09": Strategy09,
 }
 _BUILTIN_META_CACHE = None
+_BUILTIN_USAGE_NOTICE = "当前为内置策略，仅供测试研究使用，非投资建议，不构成买卖依据。"
 
 
 def _project_root():
@@ -151,7 +152,7 @@ def _build_builtin_strategy_analysis(meta, code_text):
         features.append("持仓时长约束")
     if not features:
         features.append("规则驱动交易")
-    return f"内置策略「{name}」，触发周期={kline_type}，核心特征：{'、'.join(features)}。详情以下方代码实现为准。"
+    return f"内置策略「{name}」，触发周期={kline_type}，核心特征：{'、'.join(features)}。详情以下方代码实现为准。{_BUILTIN_USAGE_NOTICE}"
 
 
 def list_builtin_strategy_meta():
@@ -175,7 +176,8 @@ def list_builtin_strategy_meta():
         item["code"] = code_text
         item["analysis_text"] = _build_builtin_strategy_analysis(item, code_text)
         item["raw_requirement_title"] = "内置策略说明"
-        item["raw_requirement"] = f"内置策略 {item['name']}（ID={sid}）由系统内置维护，可查看代码但不可直接编辑。"
+        item["raw_requirement"] = f"内置策略 {item['name']}（ID={sid}）由系统内置维护，可查看代码但不可直接编辑。{_BUILTIN_USAGE_NOTICE}"
+        item["usage_notice"] = _BUILTIN_USAGE_NOTICE
         out.append(item)
     _BUILTIN_META_CACHE = [dict(x) for x in out]
     return out
@@ -466,7 +468,8 @@ def list_all_strategy_meta():
             "analysis_text": str(b.get("analysis_text", "")),
             "code": str(b.get("code", "")),
             "raw_requirement_title": str(b.get("raw_requirement_title", "内置策略说明")),
-            "raw_requirement": str(b.get("raw_requirement", ""))
+            "raw_requirement": str(b.get("raw_requirement", "")),
+            "usage_notice": str(b.get("usage_notice", _BUILTIN_USAGE_NOTICE))
         })
     for c in custom:
         sid = str(c.get("id", "")).strip()
@@ -504,7 +507,8 @@ def list_all_strategy_meta():
             "analysis_text": str(c.get("analysis_text", "")),
             "code": str(c.get("code", "")),
             "raw_requirement_title": raw_requirement_title,
-            "raw_requirement": raw_requirement
+            "raw_requirement": raw_requirement,
+            "usage_notice": str(c.get("usage_notice", ""))
         })
     out.sort(key=lambda x: x["id"])
     return out

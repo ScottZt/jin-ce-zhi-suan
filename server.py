@@ -97,6 +97,7 @@ _QUIET_HTTP_PATHS = {
     "/api/evolution/status",
     "/api/evolution/history",
     "/api/evolution/top",
+    "/api/backtest/kline_thumb_status",
 }
 
 class _UvicornAccessPathFilter(logging.Filter):
@@ -238,6 +239,17 @@ evolution_runtime = EvolutionRuntimeManager()
 evolution_ws_events = deque(maxlen=2000)
 evolution_ws_lock = threading.Lock()
 evolution_ws_pump_task = None
+pattern_thumb_building_keys = set()
+pattern_thumb_building_lock = threading.Lock()
+pattern_thumb_warmup_task = None
+pattern_thumb_warmup_state: Dict[str, Any] = {
+    "status": "idle",
+    "total": len(CLASSIC_PATTERN_ITEMS),
+    "ready": 0,
+    "building": 0,
+    "started_at": None,
+    "finished_at": None,
+}
 _ws_event_last_emit_ts: Dict[str, float] = {}
 _WS_EVENT_THROTTLE_SECONDS = {
     "backtest_progress": 0.8,
@@ -5003,6 +5015,100 @@ def _warmup_classic_pattern_thumbs():
         except Exception:
             continue
     logger.info(f"classic pattern thumbs ready: {ok}/{len(CLASSIC_PATTERN_ITEMS)}")
+    return ok
+
+
+def _build_loading_svg_bytes(text: str) -> bytes:
+    safe = str(text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' width='440' height='210' viewBox='0 0 440 210'>"
+        "<rect width='440' height='210' fill='#020617'/>"
+        "<rect x='8' y='8' width='424' height='194' rx='8' fill='#0f172a' stroke='#334155' stroke-width='2'/>"
+        "<text x='220' y='102' text-anchor='middle' fill='#cbd5e1' font-size='16' font-family='Microsoft YaHei,SimHei,DejaVu Sans'>"
+        "经典形态缩略图加载中"
+        "</text>"
+        f"<text x='220' y='130' text-anchor='middle' fill='#94a3b8' font-size='12' font-family='Microsoft YaHei,SimHei,DejaVu Sans'>{safe}</text>"
+        "</svg>"
+    )
+    return svg.encode("utf-8")
+
+
+def _pattern_thumb_build_key(stock_code, start_dt, end_dt):
+    s = pd.to_datetime(start_dt).strftime("%Y-%m-%d")
+    e = pd.to_datetime(end_dt).strftime("%Y-%m-%d")
+    return f"{_normalize_symbol(stock_code)}|{s}|{e}"
+
+
+def _count_ready_pattern_thumbs():
+    ready = 0
+    for item in CLASSIC_PATTERN_ITEMS:
+        try:
+            stock_code = _normalize_symbol(item["stock"])
+            start_dt = pd.to_datetime(item["start"])
+            end_dt = pd.to_datetime(item["end"])
+            path = _pattern_thumb_path(stock_code, start_dt, end_dt)
+            if os.path.exists(path):
+                ready += 1
+        except Exception:
+            continue
+    return ready
+
+
+def _pattern_thumb_warmup_snapshot():
+    snap = dict(pattern_thumb_warmup_state)
+    with pattern_thumb_building_lock:
+        building = len(pattern_thumb_building_keys)
+    snap["building"] = int(building)
+    snap["ready"] = int(_count_ready_pattern_thumbs())
+    snap["total"] = len(CLASSIC_PATTERN_ITEMS)
+    snap["is_ready"] = snap["ready"] >= snap["total"] and snap["total"] > 0
+    return snap
+
+
+def _ensure_pattern_thumb_background_build(stock_code, start_dt, end_dt):
+    key = _pattern_thumb_build_key(stock_code, start_dt, end_dt)
+    img_path = _pattern_thumb_path(stock_code, start_dt, end_dt)
+    if os.path.exists(img_path):
+        return "ready"
+    with pattern_thumb_building_lock:
+        if key in pattern_thumb_building_keys:
+            return "building"
+        pattern_thumb_building_keys.add(key)
+
+    async def _runner():
+        try:
+            await asyncio.to_thread(_render_pattern_thumb_png, stock_code, start_dt, end_dt)
+        except Exception as e:
+            logger.warning(f"pattern thumb build failed: {key} err={e}")
+        finally:
+            with pattern_thumb_building_lock:
+                pattern_thumb_building_keys.discard(key)
+
+    asyncio.create_task(_runner())
+    return "queued"
+
+
+def _ensure_pattern_thumb_warmup_task():
+    global pattern_thumb_warmup_task
+    if pattern_thumb_warmup_task and not pattern_thumb_warmup_task.done():
+        return
+
+    async def _runner():
+        pattern_thumb_warmup_state["status"] = "running"
+        pattern_thumb_warmup_state["started_at"] = datetime.now().isoformat(timespec="seconds")
+        pattern_thumb_warmup_state["finished_at"] = None
+        try:
+            ready_count = await asyncio.to_thread(_warmup_classic_pattern_thumbs)
+            pattern_thumb_warmup_state["status"] = "done"
+            pattern_thumb_warmup_state["ready"] = int(ready_count)
+        except Exception as e:
+            pattern_thumb_warmup_state["status"] = "error"
+            pattern_thumb_warmup_state["error"] = str(e)
+            logger.error(f"classic pattern warmup task failed: {e}", exc_info=True)
+        finally:
+            pattern_thumb_warmup_state["finished_at"] = datetime.now().isoformat(timespec="seconds")
+
+    pattern_thumb_warmup_task = asyncio.create_task(_runner())
 
 
 @app.get("/api/backtest/kline_data")
@@ -5111,13 +5217,42 @@ async def api_backtest_kline_thumb(stock: str, start: str, end: str):
         end_dt = pd.to_datetime(end)
         if pd.isna(start_dt) or pd.isna(end_dt) or start_dt > end_dt:
             return Response(content="invalid date range", media_type="text/plain", status_code=400)
-        img_path = _render_pattern_thumb_png(stock_code, start_dt, end_dt)
-        if not img_path or not os.path.exists(img_path):
-            return Response(content="no data", media_type="text/plain", status_code=404)
-        return FileResponse(img_path, media_type="image/png")
+        img_path = _pattern_thumb_path(stock_code, start_dt, end_dt)
+        if os.path.exists(img_path):
+            return FileResponse(img_path, media_type="image/png")
+        queue_state = _ensure_pattern_thumb_background_build(stock_code, start_dt, end_dt)
+        hint = "正在准备K线数据"
+        if queue_state == "building":
+            hint = "后台生成中"
+        elif queue_state == "queued":
+            hint = "已加入后台队列"
+        return Response(
+            content=_build_loading_svg_bytes(hint),
+            media_type="image/svg+xml",
+            status_code=200,
+            headers={"Cache-Control": "no-store"}
+        )
     except Exception as e:
         logger.error(f"/api/backtest/kline_thumb failed: {e}", exc_info=True)
         return Response(content=str(e), media_type="text/plain", status_code=500)
+
+
+@app.get("/api/backtest/kline_thumb_status")
+async def api_backtest_kline_thumb_status(stock: str, start: str, end: str):
+    try:
+        stock_code = _normalize_symbol(stock)
+        start_dt = pd.to_datetime(start)
+        end_dt = pd.to_datetime(end)
+        if pd.isna(start_dt) or pd.isna(end_dt) or start_dt > end_dt:
+            return {"status": "error", "msg": "invalid date range"}
+        img_path = _pattern_thumb_path(stock_code, start_dt, end_dt)
+        if os.path.exists(img_path):
+            return {"status": "success", "ready": True, "building": False}
+        queue_state = _ensure_pattern_thumb_background_build(stock_code, start_dt, end_dt)
+        return {"status": "success", "ready": False, "building": queue_state in {"building", "queued"}}
+    except Exception as e:
+        logger.error(f"/api/backtest/kline_thumb_status failed: {e}", exc_info=True)
+        return {"status": "error", "msg": str(e)}
 
 # --- Control Endpoints for External Systems (e.g. OpenClaw) ---
 @app.post("/api/control/start_backtest")
@@ -5414,6 +5549,7 @@ def _build_status_payload(include_fund_pools: bool = True):
         "live_enabled": is_live_enabled(),
         "server_boot_id": SERVER_BOOT_ID,
         "server_started_at": SERVER_STARTED_AT,
+        "pattern_thumbs": _pattern_thumb_warmup_snapshot(),
         "progress": current_backtest_progress,
         "current_report_id": current_backtest_report.get("report_id") if current_backtest_report else None,
         "current_report_status": current_backtest_report.get("status") if current_backtest_report else None,
@@ -6218,7 +6354,7 @@ async def startup_event():
     logging.getLogger("uvicorn.access").addFilter(_UvicornAccessPathFilter())
     logger.info("Initializing Cabinet Server...")
     load_report_history()
-    _warmup_classic_pattern_thumbs()
+    _ensure_pattern_thumb_warmup_task()
     
     # Log registered routes
     logger.info("--- Registered API Endpoints ---")
