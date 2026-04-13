@@ -519,7 +519,9 @@ class TushareProvider:
             except Exception as e_rt:
                 self.last_error = f"rt_min_failed code={code} err={e_rt}"
                 self._trace_fetch("rt_min", code, result={}, err=str(e_rt))
-            df = ts.get_realtime_quotes(code)
+            # ts.get_realtime_quotes expects code without .SZ or .SH, e.g. '300274'
+            rt_code = str(code).split(".")[0]
+            df = ts.get_realtime_quotes(rt_code)    
             if df is None or df.empty:
                 end_date = datetime.now().strftime("%Y%m%d")
                 start_date = (datetime.now() - timedelta(days=10)).strftime("%Y%m%d")
