@@ -17,6 +17,7 @@ import io
 import subprocess
 import threading
 import uuid
+import signal
 from collections import deque
 import pandas as pd
 import numpy as np
@@ -98,6 +99,7 @@ _QUIET_HTTP_PATHS = {
     "/api/evolution/history",
     "/api/evolution/top",
     "/api/backtest/kline_thumb_status",
+    "/api/backtest/kline_data",
 }
 
 class _UvicornAccessPathFilter(logging.Filter):
@@ -210,6 +212,15 @@ PROJECT_ROOT = os.path.abspath(".")
 BATCH_TASKS_DIR = os.path.join("data", "batch_tasks")
 SERVER_STARTED_AT = datetime.now().isoformat(timespec="seconds")
 SERVER_BOOT_ID = f"{datetime.now().strftime('%Y%m%d%H%M%S')}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+SERVER_SHUTDOWN_CONTEXT: Dict[str, Any] = {
+    "reason": "",
+    "detail": "",
+    "origin": "",
+    "signal": "",
+    "updated_at": None,
+}
+SERVER_SIGNAL_HANDLER_CHAIN: Dict[int, Any] = {}
+server_signal_handlers_installed = False
 DEFAULT_BATCH_TASKS_CSV = os.path.join(BATCH_TASKS_DIR, "批量回测任务.csv")
 DEFAULT_BATCH_ARCHIVE_CSV = os.path.join(BATCH_TASKS_DIR, "archive", "批量回测任务.archive.csv")
 BATCH_TASK_TEMPLATE_HEADERS = [
@@ -389,6 +400,60 @@ def _resolve_server_bind(cfg=None, argv=None):
         else:
             logger.warning("Invalid cli port '%s', keep port=%s", cli_port, port)
     return host, port
+
+
+def _signal_name(signum: Any) -> str:
+    try:
+        return signal.Signals(int(signum)).name
+    except Exception:
+        return f"SIG{signum}"
+
+
+def _mark_server_shutdown_reason(reason: str, detail: str = "", origin: str = "", signal_name: str = "", overwrite: bool = False) -> None:
+    current_reason = str(SERVER_SHUTDOWN_CONTEXT.get("reason", "") or "").strip()
+    if current_reason and not overwrite:
+        return
+    SERVER_SHUTDOWN_CONTEXT["reason"] = str(reason or "").strip()
+    SERVER_SHUTDOWN_CONTEXT["detail"] = str(detail or "").strip()
+    SERVER_SHUTDOWN_CONTEXT["origin"] = str(origin or "").strip()
+    SERVER_SHUTDOWN_CONTEXT["signal"] = str(signal_name or "").strip()
+    SERVER_SHUTDOWN_CONTEXT["updated_at"] = datetime.now().isoformat(timespec="seconds")
+
+
+def _install_server_signal_handlers() -> None:
+    global server_signal_handlers_installed
+    if server_signal_handlers_installed:
+        return
+    for name in ("SIGINT", "SIGTERM", "SIGBREAK"):
+        sig_obj = getattr(signal, name, None)
+        if sig_obj is None:
+            continue
+        try:
+            sig_no = int(sig_obj)
+            prev_handler = signal.getsignal(sig_no)
+        except Exception:
+            continue
+
+        def _handler(signum, frame, _prev=prev_handler):
+            sig_name = _signal_name(signum)
+            _mark_server_shutdown_reason(
+                reason="signal",
+                detail=f"received {sig_name}",
+                origin="signal_handler",
+                signal_name=sig_name,
+            )
+            logger.warning("Received exit signal: %s", sig_name)
+            if callable(_prev):
+                _prev(signum, frame)
+            elif _prev == signal.SIG_DFL:
+                raise KeyboardInterrupt(f"received {sig_name}")
+
+        try:
+            signal.signal(sig_no, _handler)
+            SERVER_SIGNAL_HANDLER_CHAIN[sig_no] = prev_handler
+        except Exception as e:
+            logger.warning("install signal handler failed: %s error=%s", name, e)
+    server_signal_handlers_installed = True
 
 def _default_target_code(cfg=None):
     c = cfg if cfg is not None else ConfigLoader.reload()
@@ -6380,6 +6445,19 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     global history_sync_scheduler_task, evolution_ws_pump_task
+    if not str(SERVER_SHUTDOWN_CONTEXT.get("reason", "") or "").strip():
+        _mark_server_shutdown_reason(reason="shutdown_event", detail="lifecycle shutdown event", origin="fastapi", overwrite=True)
+    logger.warning(
+        "Shutdown event triggered reason=%s detail=%s origin=%s signal=%s cabinet_running=%s live_codes=%s history_sync_running=%s evolution_running=%s",
+        SERVER_SHUTDOWN_CONTEXT.get("reason", ""),
+        SERVER_SHUTDOWN_CONTEXT.get("detail", ""),
+        SERVER_SHUTDOWN_CONTEXT.get("origin", ""),
+        SERVER_SHUTDOWN_CONTEXT.get("signal", ""),
+        bool(cabinet_task and not cabinet_task.done()) if cabinet_task is not None else False,
+        _live_running_codes(),
+        bool(history_sync_scheduler_task and not history_sync_scheduler_task.done()) if history_sync_scheduler_task is not None else False,
+        bool(evolution_runtime.status().get("running", False)),
+    )
     if cabinet_task:
         cabinet_task.cancel()
     if _live_running_codes():
@@ -6393,15 +6471,43 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
+    _install_server_signal_handlers()
     cfg = ConfigLoader.reload()
     server_host, server_port = _resolve_server_bind(cfg)
     startup_server_host = server_host
     startup_server_port = server_port
-    uvicorn.run(
-        app,
-        host=server_host,
-        port=server_port,
-        ws_ping_interval=20.0,
-        ws_ping_timeout=180.0,
-        ws_max_queue=1024
-    )
+    try:
+        uvicorn.run(
+            app,
+            host=server_host,
+            port=server_port,
+            ws_ping_interval=20.0,
+            ws_ping_timeout=180.0,
+            ws_max_queue=1024
+        )
+    except KeyboardInterrupt as e:
+        _mark_server_shutdown_reason(
+            reason="keyboard_interrupt",
+            detail=str(e or "KeyboardInterrupt"),
+            origin="main",
+            signal_name=str(SERVER_SHUTDOWN_CONTEXT.get("signal", "") or ""),
+        )
+        logger.warning("Server interrupted by keyboard input: %s", e or "KeyboardInterrupt")
+    except BaseException as e:
+        _mark_server_shutdown_reason(
+            reason="fatal_exception",
+            detail=f"{type(e).__name__}: {e}",
+            origin="main",
+            overwrite=True,
+        )
+        logger.error("Server stopped by unhandled exception", exc_info=True)
+        raise
+    finally:
+        logger.warning(
+            "Server process exiting reason=%s detail=%s origin=%s signal=%s updated_at=%s",
+            SERVER_SHUTDOWN_CONTEXT.get("reason", ""),
+            SERVER_SHUTDOWN_CONTEXT.get("detail", ""),
+            SERVER_SHUTDOWN_CONTEXT.get("origin", ""),
+            SERVER_SHUTDOWN_CONTEXT.get("signal", ""),
+            SERVER_SHUTDOWN_CONTEXT.get("updated_at"),
+        )
