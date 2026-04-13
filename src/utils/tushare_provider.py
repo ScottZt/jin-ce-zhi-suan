@@ -118,6 +118,21 @@ class TushareProvider:
             return False
         return ("每分钟最多访问" in text) or ("rate limit" in text) or ("too many requests" in text) or ("频率" in text and "限制" in text)
 
+    def _is_auth_error(self, err):
+        raw = str(err or "").strip()
+        if not raw:
+            return False
+        t = raw.lower()
+        if "token" in t:
+            return True
+        if ("permission" in t) or ("unauthorized" in t) or ("forbidden" in t) or ("auth" in t):
+            return True
+        if ("权限" in raw) or ("认证" in raw) or ("授权" in raw):
+            return True
+        if ("积分" in raw) or ("点数" in raw):
+            return True
+        return False
+
     def _cleanup_rt_min_recent_calls(self, now_mono=None):
         now_v = float(now_mono if now_mono is not None else time.monotonic())
         self._rt_min_recent_calls = [x for x in self._rt_min_recent_calls if (now_v - float(x)) < 60.0]
@@ -435,6 +450,10 @@ class TushareProvider:
                     self.last_error = f"rt_min_rate_limited use_cache_ttl={int(self._rt_min_cache_ttl_sec)}s"
                     self._trace_fetch("rt_min_cache", code, start_time=start_time, end_time=end_time, result=cached, err=err_text)
                     return cached
+            if self._is_auth_error(err_text):
+                self.last_error = err_text
+            else:
+                self.last_error = f"rt_min_failed code={code} err={err_text}"
             self._trace_fetch("rt_min", code, start_time=start_time, end_time=end_time, result=pd.DataFrame(), err=err_text)
             return pd.DataFrame()
         if df is None or df.empty:
@@ -517,7 +536,11 @@ class TushareProvider:
                     self.last_error = ""
                     return payload
             except Exception as e_rt:
-                self.last_error = f"rt_min_failed code={code} err={e_rt}"
+                err_text = str(e_rt)
+                if self._is_auth_error(err_text):
+                    self.last_error = err_text
+                else:
+                    self.last_error = f"rt_min_failed code={code} err={err_text}"
                 self._trace_fetch("rt_min", code, result={}, err=str(e_rt))
             # ts.get_realtime_quotes expects code without .SZ or .SH, e.g. '300274'
             rt_code = str(code).split(".")[0]
@@ -568,7 +591,11 @@ class TushareProvider:
             self.last_error = ""
             return payload
         except Exception as e:
-            self.last_error = f"get_latest_bar_failed code={code} err={e}"
+            err_text = str(e)
+            if self._is_auth_error(err_text):
+                self.last_error = err_text
+            else:
+                self.last_error = f"get_latest_bar_failed code={code} err={err_text}"
             try:
                 end_date = datetime.now().strftime("%Y%m%d")
                 start_date = (datetime.now() - timedelta(days=10)).strftime("%Y%m%d")
@@ -636,7 +663,11 @@ class TushareProvider:
                     hist_df = pd.concat([hist_cached, df_hist_remote], ignore_index=True) if not hist_cached.empty else df_hist_remote
                     hist_df = self._normalize_minutes_df(hist_df)
                 except Exception as e:
-                    self.last_error = f"fetch_minute_data_failed code={code} range={start_str}->{end_str} err={e}"
+                    err_text = str(e)
+                    if self._is_auth_error(err_text):
+                        self.last_error = err_text
+                    else:
+                        self.last_error = f"fetch_minute_data_failed code={code} range={start_str}->{end_str} err={err_text}"
                     self._trace_fetch("stk_mins", code, start_time=start_str, end_time=end_str, result=pd.DataFrame(), err=str(e))
                     hist_df = hist_cached if not hist_cached.empty else pd.DataFrame()
         today_df = pd.DataFrame()
@@ -676,7 +707,11 @@ class TushareProvider:
             self._trace_fetch("stk_mins", code, start_time=start_str, end_time=end_str, result=out, err="empty" if out.empty else "")
             return out
         except Exception as e:
-            self.last_error = f"_fetch_stk_mins_failed code={code} freq={freq} err={e}"
+            err_text = str(e)
+            if self._is_auth_error(err_text):
+                self.last_error = err_text
+            else:
+                self.last_error = f"_fetch_stk_mins_failed code={code} freq={freq} err={err_text}"
             self._trace_fetch("stk_mins", code, start_time=start_str, end_time=end_str, result=pd.DataFrame(), err=str(e))
             return pd.DataFrame()
 
@@ -736,5 +771,28 @@ class TushareProvider:
             work = work.sort_values("dt").drop_duplicates(subset=["dt"]).reset_index(drop=True)
             return work[["code", "dt", "open", "high", "low", "close", "vol", "amount"]]
         except Exception as e:
-            self.last_error = f"fetch_daily_data_failed code={code} range={start_str}->{end_str} err={e}"
+            err_text = str(e)
+            if self._is_auth_error(err_text):
+                self.last_error = err_text
+            else:
+                self.last_error = f"fetch_daily_data_failed code={code} range={start_str}->{end_str} err={err_text}"
             return pd.DataFrame()
+
+    def check_connectivity(self, code):
+        if not self.pro:
+            return False, "tushare_token 未配置"
+        now = datetime.now()
+        start_time = now - timedelta(days=3)
+        try:
+            _ = self.pro.stk_mins(
+                ts_code=str(code).upper(),
+                freq='1min',
+                start_date=start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                end_date=now.strftime("%Y-%m-%d %H:%M:%S")
+            )
+            self.last_error = ""
+            return True, "ok"
+        except Exception as e:
+            err_text = str(e)
+            self.last_error = err_text
+            return False, err_text

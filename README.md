@@ -118,6 +118,7 @@ flowchart LR
 <p align="center">
   <img src="static/星球优惠券.png" width="45%" />
   <img src="static/星球二维码.png" width="45%" />
+  <img src="static/视频更新.png" width="45%" />
 </p>
 
 ## 快速开始

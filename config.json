@@ -22,7 +22,7 @@
     ]
   },
   "data_provider": {
-    "source": "mysql",
+    "source": "default",
     "enable_fallback": false,
     "tushare_token": "",
     "default_api_key": "",
@@ -68,7 +68,7 @@
     "strategy_llm_model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
     "strategy_llm_timeout_sec": 240,
     "api_key": "",
-    "adjustment_mode": "none"
+    "adjustment_mode": "hfq"
   },
   "history_sync": {
     "scheduler_enabled": false,
@@ -233,7 +233,7 @@
         }
       }
     },
-    "last_applied_profile": "cn_equity_intraday",
+    "last_applied_profile": "cn_equity_mid_long",
     "last_applied_market": "A股"
   },
   "live_monitoring": {

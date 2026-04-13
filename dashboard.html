@@ -4997,7 +4997,6 @@ class GeneratedStrategyTemplate(BaseImplementedStrategy):
                 subtitle: '强平与回撤限制参数',
                 fields: [
                     { path: 'risk_control.max_total_pos', label: '总仓位上限', type: 'number', unit: '%', min: 0.01, max: 1, step: 0.01, slider: true, scale: 100 },
-                    { path: 'risk_control.max_daily_loss_pct', label: '单日亏损熔断', type: 'number', unit: '%', min: 0.001, max: 0.2, step: 0.001, slider: true, scale: 100 },
                     { path: 'risk_control.max_drawdown_pct', label: '回撤限制', type: 'number', unit: '%', min: 0.001, max: 0.5, step: 0.001, slider: true, scale: 100 }
                 ]
             },
