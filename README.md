@@ -11,7 +11,7 @@
   <img alt="Status" src="https://img.shields.io/badge/Status-Active-success" />
   <img alt="Market" src="https://img.shields.io/badge/Market-A--Share-red" />
 </p>
-
+<span style="color:red">**⚠️ 当前Github发布是唯一官方版本，其他任何平台、论坛发布均非本人提供，注意风险甄别！**</span>
 ## 目录
 
 - [项目简介](#项目简介)
@@ -118,7 +118,7 @@ flowchart LR
 <p align="center">
   <img src="static/星球优惠券.png" width="45%" />
   <img src="static/星球二维码.png" width="45%" />
-  <img src="static/视频更新.png" width="45%" />
+  <img src="static/视频更新.png" width="45%" /><img src="static/数据服务.png" width="45%" />
 </p>
 
 ## 快速开始
