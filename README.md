@@ -53,6 +53,12 @@
 
 ![](C:\Users\scott\AppData\Roaming\marktext\images\2026-03-23-22-14-57-image.png)
 
+### 策略进化看板
+
+![alt text](static/策略进化看板.png)
+
+
+
 ## 架构设计(智能体智能）
 
 ### 三省（决策主链路）
