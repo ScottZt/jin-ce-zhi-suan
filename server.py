@@ -5189,7 +5189,7 @@ async def api_backtest_kline_data(stock: str, start: str, end: str):
         cached_payload = _get_cached_backtest_kline_payload(cache_key)
         if isinstance(cached_payload, dict):
             return {"status": "success", "stock": stock_code, **cached_payload}
-        payload = _build_backtest_kline_payload(stock_code, start_dt, end_dt)
+        payload = await asyncio.to_thread(_build_backtest_kline_payload, stock_code, start_dt, end_dt)
         if payload is None:
             return {"status": "error", "msg": "no data"}
         _set_cached_backtest_kline_payload(cache_key, payload)
@@ -5209,7 +5209,7 @@ async def api_backtest_kline_chart(stock: str, start: str, end: str):
         end_dt = pd.to_datetime(end)
         if pd.isna(start_dt) or pd.isna(end_dt) or start_dt > end_dt:
             return Response(content="invalid date range", media_type="text/plain", status_code=400)
-        payload = _build_backtest_kline_payload(stock_code, start_dt, end_dt)
+        payload = await asyncio.to_thread(_build_backtest_kline_payload, stock_code, start_dt, end_dt)
         if payload is None:
             return Response(content="no data", media_type="text/plain", status_code=404)
         if not payload["candles"]:

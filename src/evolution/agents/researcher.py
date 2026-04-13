@@ -19,12 +19,27 @@ class FallbackStrategyLLM:
     def __init__(self, primary: StrategyLLM, fallback: StrategyLLM):
         self.primary = primary
         self.fallback = fallback
+        self.last_call_meta: Dict[str, Any] = {}
 
     def generate(self, prompt: str, context: Dict[str, Any]) -> str:
         try:
-            return self.primary.generate(prompt=prompt, context=context)
-        except Exception:
-            return self.fallback.generate(prompt=prompt, context=context)
+            code = self.primary.generate(prompt=prompt, context=context)
+            self.last_call_meta = {
+                "path": "primary",
+                "provider": self.primary.__class__.__name__,
+                "fallback_used": False,
+            }
+            return code
+        except Exception as exc:
+            code = self.fallback.generate(prompt=prompt, context=context)
+            self.last_call_meta = {
+                "path": "fallback",
+                "provider": self.fallback.__class__.__name__,
+                "fallback_used": True,
+                "primary_provider": self.primary.__class__.__name__,
+                "primary_error": str(exc),
+            }
+            return code
 
 
 class MockStrategyLLM:
@@ -143,13 +158,63 @@ class Researcher:
             profile=profile,
         )
         prompt = f"seed_fp={seed_fp}, iteration={iteration}, parent={parent_id}, keep trend+risk shape."
-        candidate = self.llm_client.generate(prompt=prompt, context=context)
+        self.bus.publish(
+            "LLMExecution",
+            {
+                "iteration": iteration,
+                "stage": "start",
+                "provider": self.llm_client.__class__.__name__,
+                "prompt_chars": len(prompt),
+                "seed_strategy_id": parent_id,
+            },
+        )
+        candidate = ""
+        call_meta: Dict[str, Any] = {}
+        try:
+            candidate = self.llm_client.generate(prompt=prompt, context=context)
+            call_meta = self._extract_llm_meta()
+        except Exception as exc:
+            self.bus.publish(
+                "LLMExecution",
+                {
+                    "iteration": iteration,
+                    "stage": "error",
+                    "provider": self.llm_client.__class__.__name__,
+                    "error": str(exc),
+                    "seed_strategy_id": parent_id,
+                },
+            )
+            raise
+        self.bus.publish(
+            "LLMExecution",
+            {
+                "iteration": iteration,
+                "stage": "done",
+                "provider": str(call_meta.get("provider") or self.llm_client.__class__.__name__),
+                "fallback_used": bool(call_meta.get("fallback_used", False)),
+                "path": str(call_meta.get("path", "") or ""),
+                "primary_provider": str(call_meta.get("primary_provider", "") or ""),
+                "primary_error": str(call_meta.get("primary_error", "") or ""),
+                "code_chars": len(str(candidate or "")),
+                "seed_strategy_id": parent_id,
+            },
+        )
         validated = self._validate_candidate(candidate)
         strategy_code = self._ensure_not_duplicate(validated, {seed_fp})
         return {
             "strategy_code": strategy_code,
             "parent_strategy_id": parent_id,
             "parent_strategy_name": parent_name or parent_id,
+        }
+
+    def _extract_llm_meta(self) -> Dict[str, Any]:
+        meta = getattr(self.llm_client, "last_call_meta", None)
+        if isinstance(meta, dict):
+            return dict(meta)
+        return {
+            "provider": self.llm_client.__class__.__name__,
+            "fallback_used": False,
+            "path": "direct",
         }
 
     def _build_context(

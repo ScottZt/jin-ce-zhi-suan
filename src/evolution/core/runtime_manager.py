@@ -92,17 +92,12 @@ class EvolutionRuntimeManager:
         if thread and thread.is_alive():
             thread.join(timeout=2.0)
         with self._lock:
-            if self._state["running"]:
-                self._state["running"] = False
-                self._state["last_status"] = "stopped"
-                self._state["finished_at"] = datetime.now().isoformat(timespec="seconds")
-                self._state["active_event_type"] = "stopped"
-                self._state["active_phase"] = "stopped"
-                self._state["active_phase_label"] = "已停止"
-                self._state["active_message"] = "进化任务已停止"
-                self._state["active_data_status"] = "idle"
-                self._state["active_updated_at"] = datetime.now().isoformat(timespec="seconds")
+            self._state["running"] = False
+            self._state["last_status"] = "stopped"
+            self._state["finished_at"] = datetime.now().isoformat(timespec="seconds")
+            self._set_terminal_activity_unlocked(mode="stopped")
             snapshot = self._snapshot_unlocked()
+        self._emit_event({"kind": "progress", "progress": snapshot.get("activity", {})})
         self._emit_event({"kind": "state", "state": snapshot})
         return snapshot
 
@@ -160,6 +155,8 @@ class EvolutionRuntimeManager:
                 "reason": reason,
                 "error": error_text,
                 "cost_ms": int((time.time() - started) * 1000),
+                "persist_enabled": bool(profile.get("persist_enabled", True)),
+                "persist_score_threshold": profile.get("persist_score_threshold"),
                 "parent_strategy_id": str(detail.get("parent_strategy_id", "") or ""),
                 "parent_strategy_name": str(detail.get("parent_strategy_name", "") or ""),
                 "best_timeframe": str(detail.get("best_timeframe", "") or ""),
@@ -169,6 +166,12 @@ class EvolutionRuntimeManager:
                 "committed_strategy_id": str(detail.get("committed_strategy_id", "") or ""),
                 "committed_strategy_name": str(detail.get("committed_strategy_name", "") or ""),
                 "committed_version": detail.get("committed_version"),
+                "llm_provider": str(detail.get("llm_provider", "") or ""),
+                "llm_path": str(detail.get("llm_path", "") or ""),
+                "llm_stage": str(detail.get("llm_stage", "") or ""),
+                "llm_fallback_used": bool(detail.get("llm_fallback_used", False)),
+                "llm_primary_provider": str(detail.get("llm_primary_provider", "") or ""),
+                "llm_primary_error": str(detail.get("llm_primary_error", "") or ""),
                 "time": datetime.now().isoformat(timespec="seconds"),
             }
             with self._lock:
@@ -189,7 +192,11 @@ class EvolutionRuntimeManager:
                 self._state["last_status"] = "stopped"
             self._state["finished_at"] = datetime.now().isoformat(timespec="seconds")
             self._thread = None
-        self._emit_event({"kind": "state", "state": self.status()})
+            mode = "stopped" if self._stop_event.is_set() else "completed"
+            self._set_terminal_activity_unlocked(mode=mode)
+            snapshot = self._snapshot_unlocked()
+        self._emit_event({"kind": "progress", "progress": snapshot.get("activity", {})})
+        self._emit_event({"kind": "state", "state": snapshot})
 
     def _on_orchestrator_event(self, event: Dict[str, Any]) -> None:
         payload = event if isinstance(event, dict) else {}
@@ -210,6 +217,42 @@ class EvolutionRuntimeManager:
                 self._state["active_message"] = f"迭代 {iter_no} 启动"
                 self._state["active_progress_pct"] = 1
                 self._state["active_data_status"] = "checking"
+            elif event_type_lower == "llmexecution":
+                iter_no = int(body.get("iteration", 0) or 0)
+                if iter_no > 0:
+                    self._state["iteration"] = max(int(self._state.get("iteration", 0) or 0), iter_no)
+                stage = str(body.get("stage", "") or "").strip().lower()
+                provider = str(body.get("provider", "") or "").strip() or "unknown"
+                fallback_used = bool(body.get("fallback_used", False))
+                primary_provider = str(body.get("primary_provider", "") or "").strip()
+                primary_error = str(body.get("primary_error", "") or "").strip()
+                self._state["last_status"] = "running"
+                self._state["active_phase"] = "llm"
+                self._state["active_phase_label"] = "大模型生成"
+                if stage == "start":
+                    self._state["active_message"] = f"LLM开始生成候选策略，provider={provider}"
+                    self._state["active_progress_pct"] = max(int(self._state.get("active_progress_pct", 0) or 0), 2)
+                    self._state["active_data_status"] = "checking"
+                elif stage == "done":
+                    if fallback_used:
+                        fallback_hint = f"，主模型={primary_provider}" if primary_provider else ""
+                        error_hint = f"，原因={primary_error}" if primary_error else ""
+                        self._state["active_message"] = (
+                            f"LLM生成完成（已回落Mock），provider={provider}{fallback_hint}{error_hint}"
+                        )
+                        self._state["active_data_status"] = "warning"
+                    else:
+                        self._state["active_message"] = f"LLM生成完成，provider={provider}"
+                        self._state["active_data_status"] = "ok"
+                    self._state["active_progress_pct"] = max(int(self._state.get("active_progress_pct", 0) or 0), 6)
+                elif stage == "error":
+                    err = str(body.get("error", "") or "").strip()
+                    self._state["active_message"] = f"LLM调用失败，provider={provider}{f'，error={err}' if err else ''}"
+                    self._state["active_data_status"] = "error"
+                    self._state["active_progress_pct"] = max(int(self._state.get("active_progress_pct", 0) or 0), 2)
+                else:
+                    self._state["active_message"] = f"LLM执行中，provider={provider}"
+                    self._state["active_progress_pct"] = max(int(self._state.get("active_progress_pct", 0) or 0), 2)
             elif event_type_lower == "strategygenerated":
                 self._state["last_status"] = "running"
                 self._state["active_phase"] = "research"
@@ -302,6 +345,44 @@ class EvolutionRuntimeManager:
             sink(payload if isinstance(payload, dict) else {})
         except Exception:
             pass
+
+    def _set_terminal_activity_unlocked(self, mode: str) -> None:
+        now = datetime.now().isoformat(timespec="seconds")
+        last_status = str(self._state.get("last_status", "") or "").strip().lower()
+        current_data_status = str(self._state.get("active_data_status", "") or "").strip().lower()
+
+        if mode == "stopped":
+            phase = "stopped"
+            phase_label = "已停止"
+            message = "进化任务已停止"
+            event_type = "stopped"
+            data_status = "idle"
+            progress_pct = int(self._state.get("active_progress_pct", 0) or 0)
+        else:
+            phase = "completed"
+            phase_label = "已完成"
+            event_type = "completed"
+            if last_status == "error":
+                message = "进化任务已完成（存在异常）"
+                data_status = "error"
+            elif last_status == "rejected":
+                message = "进化任务已完成（候选被拒绝）"
+                data_status = "warning"
+            else:
+                message = "进化任务已完成"
+                if current_data_status in {"", "idle", "checking"}:
+                    data_status = "ok" if int(self._state.get("iteration", 0) or 0) > 0 else "idle"
+                else:
+                    data_status = current_data_status
+            progress_pct = 100
+
+        self._state["active_event_type"] = event_type
+        self._state["active_phase"] = phase
+        self._state["active_phase_label"] = phase_label
+        self._state["active_message"] = message
+        self._state["active_data_status"] = data_status
+        self._state["active_progress_pct"] = max(0, min(100, int(progress_pct)))
+        self._state["active_updated_at"] = now
 
     def _snapshot_unlocked(self) -> Dict[str, Any]:
         return {

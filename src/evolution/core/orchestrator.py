@@ -42,12 +42,14 @@ class EvolutionOrchestrator:
         self._last_rejected: Dict[str, Any] = {}
         self._last_backtest: Dict[str, Any] = {}
         self._last_committed: Dict[str, Any] = {}
+        self._last_llm: Dict[str, Any] = {}
         self._runtime_event_sink: Optional[Callable[[Dict[str, Any]], None]] = None
         self.bus.subscribe("StrategyGenerated", self._on_strategy_generated)
         self.bus.subscribe("StrategyRejected", self._on_strategy_rejected)
         self.bus.subscribe("BacktestFinished", self._on_backtest_finished)
         self.bus.subscribe("StrategyCommitted", self._on_strategy_committed)
         self.bus.subscribe("StrategyScored", self._on_strategy_scored)
+        self.bus.subscribe("LLMExecution", self._on_llm_execution)
         self._subscribe_runtime_event("Start")
         self._subscribe_runtime_event("StrategyGenerated")
         self._subscribe_runtime_event("StrategyApproved")
@@ -56,6 +58,7 @@ class EvolutionOrchestrator:
         self._subscribe_runtime_event("BacktestFinished")
         self._subscribe_runtime_event("StrategyScored")
         self._subscribe_runtime_event("StrategyCommitted")
+        self._subscribe_runtime_event("LLMExecution")
 
     def run_once(self, iteration: int, profile_override: Optional[Dict[str, Any]] = None) -> Any:
         profile = self._resolve_profile(profile_override)
@@ -64,6 +67,7 @@ class EvolutionOrchestrator:
         self._last_rejected = {}
         self._last_backtest = {}
         self._last_committed = {}
+        self._last_llm = {}
         self.bus.publish("Start", {"iteration": int(iteration), "profile": profile.to_dict()})
         status = str(self._last_result.get("status", "rejected"))
         if status == "ok":
@@ -116,6 +120,12 @@ class EvolutionOrchestrator:
             "committed_strategy_id": str(committed.get("strategy_id", "") or ""),
             "committed_strategy_name": str(committed.get("strategy_name", "") or ""),
             "committed_version": committed.get("version"),
+            "llm_provider": str(self._last_llm.get("provider", "") or ""),
+            "llm_path": str(self._last_llm.get("path", "") or ""),
+            "llm_stage": str(self._last_llm.get("stage", "") or ""),
+            "llm_fallback_used": bool(self._last_llm.get("fallback_used", False)),
+            "llm_primary_provider": str(self._last_llm.get("primary_provider", "") or ""),
+            "llm_primary_error": str(self._last_llm.get("primary_error", "") or ""),
         }
 
     def _on_strategy_generated(self, data: Dict[str, Any]) -> None:
@@ -148,6 +158,18 @@ class EvolutionOrchestrator:
             "strategy_id": str(payload.get("strategy_id", "") or ""),
             "strategy_name": str(payload.get("strategy_name", "") or ""),
             "version": payload.get("version"),
+        }
+
+    def _on_llm_execution(self, data: Dict[str, Any]) -> None:
+        payload = data if isinstance(data, dict) else {}
+        self._last_llm = {
+            "iteration": int(payload.get("iteration", 0) or 0),
+            "stage": str(payload.get("stage", "") or ""),
+            "provider": str(payload.get("provider", "") or ""),
+            "path": str(payload.get("path", "") or ""),
+            "fallback_used": bool(payload.get("fallback_used", False)),
+            "primary_provider": str(payload.get("primary_provider", "") or ""),
+            "primary_error": str(payload.get("primary_error", "") or ""),
         }
 
     def _to_float(self, value: Any, default: float = 0.0) -> float:

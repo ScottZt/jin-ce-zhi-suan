@@ -72,6 +72,7 @@ class EvolutionLLMConfig:
 class OpenAICompatibleStrategyLLM:
     def __init__(self, cfg: EvolutionLLMConfig):
         self.cfg = cfg
+        self.last_call_meta: Dict[str, Any] = {}
 
     def generate(self, prompt: str, context: Dict[str, Any]) -> str:
         req_body = self._build_request_body(prompt=prompt, context=context)
@@ -82,10 +83,25 @@ class OpenAICompatibleStrategyLLM:
                 content = self._request_once(endpoint=endpoint, body=req_body)
                 code = self._extract_code(content)
                 if code.strip():
+                    self.last_call_meta = {
+                        "provider": "openai_compatible",
+                        "model": self.cfg.model,
+                        "endpoint": endpoint,
+                        "fallback_used": False,
+                        "path": "direct",
+                    }
                     return code
                 raise RuntimeError("LLM 返回内容为空")
             except Exception as exc:
                 last_error = exc
+        self.last_call_meta = {
+            "provider": "openai_compatible",
+            "model": self.cfg.model,
+            "endpoint": endpoint,
+            "fallback_used": False,
+            "path": "direct",
+            "error": str(last_error),
+        }
         raise RuntimeError(f"LLM 调用失败: {last_error}")
 
     def _endpoint(self) -> str:

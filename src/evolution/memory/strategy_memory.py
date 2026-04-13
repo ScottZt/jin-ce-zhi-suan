@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+import re
 from typing import Any, Dict, List, Optional, Protocol
 
 from src.evolution.core.event_bus import EventBus
@@ -35,8 +36,12 @@ class StrategyMemory:
         self.backend = backend or InMemoryBackend()
 
     def save(self, strategy_code: str, score: float, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        strategy_meta = self._extract_strategy_meta(strategy_code)
         record = {
             "strategy_code": str(strategy_code or ""),
+            "strategy_id": strategy_meta.get("strategy_id", ""),
+            "strategy_name": strategy_meta.get("strategy_name", ""),
+            "class_name": strategy_meta.get("class_name", ""),
             "score": self._to_float(score),
             "metrics": self._normalize_metrics(metrics),
             "created_at": datetime.utcnow().isoformat(timespec="seconds"),
@@ -64,6 +69,27 @@ class StrategyMemory:
             return float(value)
         except Exception:
             return float(default)
+
+    def _extract_strategy_meta(self, strategy_code: str) -> Dict[str, str]:
+        code = str(strategy_code or "")
+        out = {
+            "strategy_id": "",
+            "strategy_name": "",
+            "class_name": "",
+        }
+        if not code.strip():
+            return out
+        class_match = re.search(r"class\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", code)
+        if class_match:
+            out["class_name"] = str(class_match.group(1) or "").strip()
+        super_match = re.search(
+            r"super\(\)\.__init__\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"]([^'\"]+)['\"]",
+            code,
+        )
+        if super_match:
+            out["strategy_id"] = str(super_match.group(1) or "").strip()
+            out["strategy_name"] = str(super_match.group(2) or "").strip()
+        return out
 
 
 class MemoryAgent:

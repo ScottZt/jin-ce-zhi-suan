@@ -18,7 +18,8 @@
       "data_provider.postgres_password",
       "data_provider.default_api_url",
       "webhook_notification.feishu_webhook_url",
-      "webhook_notification.feishu_secret"
+      "webhook_notification.feishu_secret",
+      "evolution.llm.api_key"
     ]
   },
   "data_provider": {
@@ -384,17 +385,17 @@
   },
   "evolution": {
     "llm": {
-      "enabled": false,
-      "provider": "",
-      "model": "",
-      "base_url": "",
-      "timeout_seconds": 0,
-      "retry_times": 0,
+      "enabled": true,
+      "provider": "openai_compatible",
+      "model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "timeout_seconds": 120,
+      "retry_times": 1,
       "api_key": "",
-      "fallback_to_mock": false,
-      "temperature": 0,
-      "max_tokens": 0,
-      "system_prompt": ""
+      "fallback_to_mock": true,
+      "temperature": 0.2,
+      "max_tokens": 1200,
+      "system_prompt": "你是量化策略生成助手。只输出可执行Python策略代码（不要解释、不要markdown）。必须继承BaseImplementedStrategy，并实现on_bar。禁止使用未来函数/回看偏差。遵守A股规则：T+1、涨停不可买、跌停不可卖。"
     }
   }
 }
