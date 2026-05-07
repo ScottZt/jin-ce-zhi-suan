@@ -1,6 +1,6 @@
 {
   "system": {
-    "mode": "backtest",
+    "mode": "live",
     "enable_live": false,
     "initial_capital": 1000000,
     "live_kline_log_on_change_only": true,
@@ -24,12 +24,15 @@
     ],
     "live_auto_start_enabled": false,
     "live_auto_start_time": "09:20",
-    "live_auto_start_strategy_ids": []
+    "live_auto_start_strategy_ids": [
+      "01",
+      "MY01"
+    ]
   },
   "data_provider": {
     "source": "duckdb",
-    "enable_fallback": false,
-    "tushare_api_url": "http://tushare.xyz",
+    "enable_fallback": true,
+    "tushare_api_url": "https://tushare.pro",
     "tushare_token": "",
     "default_api_key": "",
     "default_api_url": "",
@@ -65,7 +68,7 @@
     "postgres_table_30min": "dat_30mins",
     "postgres_table_60min": "dat_60mins",
     "postgres_table_day": "dat_day",
-    "duckdb_path": "G:\\duckdb\\quantifydata.duckdb",
+    "duckdb_path": "D:/duckdb/quantifydata.duckdb",
     "duckdb_query_page_size": 20000,
     "duckdb_table_1min": "dat_1mins",
     "duckdb_table_5min": "dat_5mins",
@@ -74,17 +77,17 @@
     "duckdb_table_30min": "dat_30mins",
     "duckdb_table_60min": "dat_60mins",
     "duckdb_table_day": "dat_day",
-    "backtest_cache_db_source": "",
-    "llm_api_url": "https://api.siliconflow.cn/v1",
+    "backtest_cache_db_source": "duckdb",
+    "llm_api_url": "https://api.minimaxi.com/v1",
     "llm_api_key": "",
-    "llm_model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
-    "strategy_llm_api_url": "https://api.siliconflow.cn/v1",
+    "llm_model": "MiniMax-M2.7-highspeed",
+    "strategy_llm_api_url": "https://api.minimaxi.com/v1",
     "strategy_llm_api_key": "",
-    "strategy_llm_model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+    "strategy_llm_model": "MiniMax-M2.7-highspeed",
     "strategy_llm_timeout_sec": 240,
     "api_key": "",
     "adjustment_mode": "hfq",
-    "tdxdir": "D:\\new_tdx64",
+    "tdxdir": "D:\\new_tdx",
     "tdx_host": "",
     "tdx_port": 0,
     "tdx_node_list": "",
@@ -95,11 +98,10 @@
   "history_sync": {
     "scheduler_enabled": false,
     "interval_minutes": 60,
-    "scheduler_start_time": "09:30",
-    "time_mode": "custom",
+    "time_mode": "lookback",
     "lookback_days": 20,
-    "custom_start_time": "2026-04-01 09:30:00",
-    "custom_end_time": "2026-04-01 15:00:00",
+    "custom_start_time": "2026-05-06 09:30:00",
+    "custom_end_time": "2026-05-06 15:00:00",
     "session_only": true,
     "intraday_mode": false,
     "max_codes": 10000,
@@ -116,11 +118,14 @@
     "dry_run": false,
     "on_duplicate": "ignore",
     "write_mode": "direct_db",
-    "direct_db_source": ""
+    "direct_db_source": "duckdb"
   },
   "targets": [],
   "strategies": {
-    "active_ids": []
+    "active_ids": [
+      "01",
+      "MY01"
+    ]
   },
   "risk_control": {
     "max_stop_loss_pct": 0.1,
@@ -131,7 +136,7 @@
   },
   "trading_cost": {
     "commission_rate": 0.00025,
-    "min_commission": 5.0,
+    "min_commission": 5,
     "stamp_duty": 0.001,
     "transfer_fee": 0
   },
@@ -327,9 +332,7 @@
       "zhongshu",
       "menxia",
       "daily_summary",
-      "system",
-      "backtest_result",
-      "backtest_failed"
+      "system"
     ],
     "webhook_urls": [],
     "feishu_webhook_url": "",
@@ -350,9 +353,7 @@
       "D",
       "E",
       "F",
-      "I",
-      "J",
-      "K"
+      "I"
     ]
   },
   "strategy_params": {
@@ -411,14 +412,19 @@
       "dynamic_order_qty": 350,
       "max_dynamic_qty": 1050,
       "stop_loss_pct": 0.05
+    },
+    "CM": {
+      "pullback_pct": 0.01,
+      "trailing_stop_pct": 0.02,
+      "stop_loss_pct": 0.03
     }
   },
   "evolution": {
     "llm": {
       "enabled": true,
       "provider": "openai_compatible",
-      "model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
-      "base_url": "https://api.siliconflow.cn/v1",
+      "model": "MiniMax-M2.7-highspeed",
+      "base_url": "https://api.minimaxi.com/v1",
       "timeout_seconds": 120,
       "retry_times": 1,
       "api_key": "",
@@ -576,7 +582,7 @@
     "apply_in_backtest": true,
     "apply_in_live": true,
     "prefetch_on_backtest_start": true,
-    "provider": "tushare",
+    "provider": "tdx",
     "cache_ttl_sec": 0,
     "min_refresh_interval_sec": 0,
     "tushare_interfaces": {

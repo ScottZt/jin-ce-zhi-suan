@@ -128,7 +128,10 @@ class FundamentalAdapterManager:
 
     def _disk_cache_dir(self) -> str:
         node = self._cfg()
-        raw = str(node.get("disk_cache_dir", "data/fundamental_cache") or "data/fundamental_cache").strip()
+        raw = str(node.get("disk_cache_dir", "D:/jin-ce-zhi-suan/data/fundamental_cache") or "D:/jin-ce-zhi-suan/data/fundamental_cache").strip()
+        # Ensure Windows path format
+        if raw.startswith("/") or raw.startswith("\\wsl"):
+            raw = "D:/jin-ce-zhi-suan/data/fundamental_cache"
         return os.path.abspath(raw)
 
     def _disk_cache_max_files(self) -> int:

@@ -3,6 +3,8 @@ from src.strategies.implemented_strategies import (
     Strategy00, Strategy01, Strategy02, Strategy03, Strategy04, Strategy05,
     Strategy06, Strategy07, Strategy08, Strategy09
 )
+from src.strategies.my_strategy import MyStrategy
+from src.strategies.strategy_checkmate import StrategyCM
 from src.strategies.strategy_manager_repo import (
     load_custom_strategies,
     load_disabled_ids,
@@ -25,7 +27,9 @@ def create_strategies(apply_active_filter=True):
         Strategy06(),
         Strategy07(),
         Strategy08(),
-        Strategy09()
+        Strategy09(),
+        StrategyCM(),  # Checkmate 将死趋势回调策略
+        MyStrategy()
     ]
     builtin_ids = {str(s.id).strip() for s in strategies}
     disabled_ids = load_disabled_ids()

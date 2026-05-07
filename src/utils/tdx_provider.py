@@ -24,7 +24,7 @@ class TdxProvider:
         explicit_dir = str(tdxdir or "").strip()
         self.tdxdir = explicit_dir if explicit_dir else self._resolve_tdxdir(cfg)
         self._cache_enabled = bool(cfg.get("data_provider.local_cache_enabled", True))
-        cache_dir = str(cfg.get("data_provider.local_cache_dir", "data/history/cache") or "data/history/cache")
+        cache_dir = str(cfg.get("data_provider.local_cache_dir", "D:/jin-ce-zhi-suan/data/history/cache") or "D:/jin-ce-zhi-suan/data/history/cache")
         base_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(os.path.dirname(base_dir))
         self._cache_dir = cache_dir if os.path.isabs(cache_dir) else os.path.join(project_root, cache_dir)
