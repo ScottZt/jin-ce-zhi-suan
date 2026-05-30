@@ -396,6 +396,9 @@ class DuckDbProvider:
 
     def upsert_kline_data_with_conn(self, conn, df, interval="1min", batch_size=2000):
         # 复用同一连接批量写入，供历史同步串行写线程持续刷盘。
+        # DuckDB 原生批量路径：register DataFrame 为临时视图 + 直接 INSERT。
+        # 同步服务已在 _process_code_sync 中对目标库做过缺失判定，
+        # 传入数据都是目标库不存在的行，无需 upsert / DELETE 等大表操作。
         table = self._resolve_table_name(str(interval or "1min"))
         if not table:
             self.last_error = f"未配置 {interval} 对应的 DuckDB 表名"
@@ -404,47 +407,39 @@ class DuckDbProvider:
         if norm.empty:
             self.last_error = ""
             return 0
-        rows = [
-            (
-                str(r["code"]),
-                pd.to_datetime(r["trade_time"]).to_pydatetime(),
-                float(r["open"]),
-                float(r["high"]),
-                float(r["low"]),
-                float(r["close"]),
-                float(r["vol"]),
-                float(r["amount"]),
-            )
-            for _, r in norm.iterrows()
-        ]
-        insert_sql = (
-            f"INSERT INTO {self._quoted_table(table)} (code, trade_time, open, high, low, close, vol, amount) "
-            f"VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        )
-        upsert_sql = (
-            f"INSERT INTO {self._quoted_table(table)} (code, trade_time, open, high, low, close, vol, amount) "
-            f"VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
-            f"ON CONFLICT (code, trade_time) DO UPDATE SET "
-            f"open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, close=EXCLUDED.close, "
-            f"vol=EXCLUDED.vol, amount=EXCLUDED.amount"
-        )
-        written = 0
-        try:
-            step = max(1, int(batch_size or 2000))
-            for i in range(0, len(rows), step):
-                chunk = rows[i:i + step]
-                try:
-                    conn.executemany(upsert_sql, chunk)
-                except Exception as e:
-                    err_text = str(e).lower()
-                    if "conflict target" in err_text or ("unique" in err_text and "primary key" in err_text):
-                        conn.executemany(insert_sql, chunk)
-                    else:
-                        raise
-                written += len(chunk)
-        except Exception as e:
-            self.last_error = f"DuckDB 写入缓存失败: {e}"
+
+        # batch 内去重：多只股票的数据合并后可能含同 (code, trade_time) 的行
+        norm = norm.drop_duplicates(subset=['code', 'trade_time'], keep='last').reset_index(drop=True)
+        if norm.empty:
+            self.last_error = ""
             return 0
+
+        view_name = f"_upsert_tmp_{table}"
+        written = 0
+        total = len(norm)
+        step = max(1, int(batch_size or 2000))
+        tbl = self._quoted_table(table)
+
+        for i in range(0, total, step):
+            chunk = norm.iloc[i:i + step]
+            try:
+                conn.register(view_name, chunk)
+                conn.execute(
+                    f"INSERT INTO {tbl} "
+                    f"(code, trade_time, open, high, low, close, vol, amount) "
+                    f"SELECT code, trade_time, open, high, low, close, vol, amount "
+                    f"FROM {view_name}"
+                )
+                written += len(chunk)
+            except Exception as e:
+                self.last_error = f"DuckDB 写入缓存失败: {e}"
+                return 0
+            finally:
+                try:
+                    conn.unregister(view_name)
+                except Exception:
+                    pass
+
         self.last_error = ""
         return written
 
@@ -453,9 +448,88 @@ class DuckDbProvider:
         if conn is None:
             return 0
         try:
-            return int(self.upsert_kline_data_with_conn(conn, df, interval=interval, batch_size=batch_size) or 0)
+            return int(self._upsert_with_fallback(conn, df, interval=interval, batch_size=batch_size) or 0)
         finally:
             try:
                 conn.close()
             except Exception:
                 pass
+
+    def _upsert_with_fallback(self, conn, df, interval="1min", batch_size=2000):
+        # 非同步路径独立调用时的 upsert 逻辑，需要处理重复数据。
+        # 同步串行写线程走 upsert_kline_data_with_conn 直插即可。
+        table = self._resolve_table_name(str(interval or "1min"))
+        if not table:
+            self.last_error = f"未配置 {interval} 对应的 DuckDB 表名"
+            return 0
+        norm = self._normalize_for_upsert(df)
+        if norm.empty:
+            self.last_error = ""
+            return 0
+        norm = norm.drop_duplicates(subset=['code', 'trade_time'], keep='last').reset_index(drop=True)
+        if norm.empty:
+            self.last_error = ""
+            return 0
+
+        view_name = f"_upsert_tmp_{table}"
+        written = 0
+        total = len(norm)
+        step = max(1, int(batch_size or 2000))
+        tbl = self._quoted_table(table)
+
+        for i in range(0, total, step):
+            chunk = norm.iloc[i:i + step]
+            try:
+                conn.register(view_name, chunk)
+                # 先尝试 ON CONFLICT upsert（小表和有索引表语义正确）
+                conn.execute(
+                    f"INSERT INTO {tbl} "
+                    f"(code, trade_time, open, high, low, close, vol, amount) "
+                    f"SELECT code, trade_time, open, high, low, close, vol, amount "
+                    f"FROM {view_name} "
+                    f"ON CONFLICT (code, trade_time) DO UPDATE SET "
+                    f"open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, "
+                    f"close=EXCLUDED.close, vol=EXCLUDED.vol, amount=EXCLUDED.amount"
+                )
+                written += len(chunk)
+            except Exception:
+                # ON CONFLICT 失败（无索引 / OOM 等），回退到 DELETE-then-INSERT
+                try:
+                    conn.execute(
+                        f"DELETE FROM {tbl} "
+                        f"WHERE EXISTS ("
+                        f"  SELECT 1 FROM {view_name} v"
+                        f"  WHERE {tbl}.code = v.code"
+                        f"  AND CAST({tbl}.trade_time AS VARCHAR)"
+                        f"      = CAST(v.trade_time AS VARCHAR)"
+                        f")"
+                    )
+                    conn.execute(
+                        f"INSERT INTO {tbl} "
+                        f"(code, trade_time, open, high, low, close, vol, amount) "
+                        f"SELECT code, trade_time, open, high, low, close, vol, amount "
+                        f"FROM {view_name}"
+                    )
+                    written += len(chunk)
+                except Exception:
+                    # DELETE 也失败（大表 OOM / 类型不匹配），最终回退到直插。
+                    # 同步路径已通过缺失判定过滤掉重复行，这里仅处理极端情况。
+                    try:
+                        conn.execute(
+                            f"INSERT INTO {tbl} "
+                            f"(code, trade_time, open, high, low, close, vol, amount) "
+                            f"SELECT code, trade_time, open, high, low, close, vol, amount "
+                            f"FROM {view_name}"
+                        )
+                        written += len(chunk)
+                    except Exception as e3:
+                        self.last_error = f"DuckDB 写入缓存失败: {e3}"
+                        return 0
+            finally:
+                try:
+                    conn.unregister(view_name)
+                except Exception:
+                    pass
+
+        self.last_error = ""
+        return written
