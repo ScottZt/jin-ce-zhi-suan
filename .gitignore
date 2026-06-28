@@ -52,4 +52,5 @@ data/批量回测结果.csv
 docs/GRAPHIFY-复用与部署教程.md
 
 # Graphify（大文件不提交，manifest/report 可选共享）
-graphify-out/
+graphify-out/cache/
+graphify-out/2*
